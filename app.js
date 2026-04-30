@@ -51,7 +51,31 @@ $(document).ready(function () {
     Chart.register(ChartDataLabels);
     $('.form-select').select2({ theme: 'bootstrap-5', placeholder: 'Todas...', allowClear: true, closeOnSelect: false, templateResult: formatState });
 
-    const conf = { language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json' }, pageLength: 20, deferRender: true };
+    // ==========================================
+    // CONFIGURACIÓN DATATABLES (CORRECCIÓN DE ORDENAMIENTO)
+    // ==========================================
+    const conf = { 
+        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json' }, 
+        pageLength: 20, 
+        deferRender: true,
+        columnDefs: [
+            {
+                targets: [3, 4, 6, 7, 8, 9, 10, 11], // Todas las columnas numéricas
+                render: function (data, type) {
+                    if (type === 'display') return formatNum(data);
+                    return data; // Usa el número crudo para ordenar
+                }
+            },
+            {
+                targets: [5], // Columna de Diferencia (la de los colores)
+                render: function (data, type) {
+                    if (type === 'display') return formatBadge(data);
+                    return data; // Usa el número crudo para ordenar
+                }
+            }
+        ]
+    };
+    
     tablaG = $('#tablaGrupo').DataTable(conf);
     tablaT = $('#tablaTienda').DataTable(conf);
 
@@ -70,9 +94,7 @@ $(document).ready(function () {
                 
                 const upperName = String(tdaName).toUpperCase();
                 
-                // ==========================================
-                // EXCLUSIÓN DE TIENDA FANTASMA
-                // ==========================================
+                // Exclusión de tienda fantasma
                 if (upperName.includes('MEGATIENDA#2-AEC-DS')) return; 
 
                 const empresa = determineEmpresa(upperName);
@@ -137,7 +159,6 @@ function getFiltros() {
 function filtrarYActualizar() {
     actualizando = true; const f = getFiltros();
     
-    // Función 1: Filtro de Producto (Afecta a TODOS)
     const matchProducto = (d) => {
         if (f.emp.length && !f.emp.includes(d.emp)) return false;
         if (f.div.length && !f.div.includes(d.div)) return false;
@@ -146,7 +167,6 @@ function filtrarYActualizar() {
         return true;
     };
 
-    // Función 2: Filtro de Tienda (Afecta SOLO a las Tiendas, no al CEDIS)
     const matchTienda = (d) => {
         if (f.catT.length && !f.catT.includes(d.catT)) return false;
         if (f.tipo.length && !f.tipo.includes(d.tipoFiltro)) return false;
@@ -154,7 +174,6 @@ function filtrarYActualizar() {
         return true;
     };
 
-    // Separamos la base de datos para no afectar el CEDIS con los filtros locales
     let filteredVentas = globalData.filter(d => matchProducto(d) && matchTienda(d));
     let filteredCedis = globalData.filter(d => d.is_cedis && matchProducto(d));
 
@@ -187,7 +206,6 @@ function actualizarTablas(ventasData, cedisData) {
     let resG = {}, resT = {};
     let cedisStockByGrupo = {};
 
-    // Mapeo general del inventario en CEDIS
     cedisData.forEach(d => {
         const kBodega = d.emp + '|' + d.grp; 
         if (!cedisStockByGrupo[kBodega]) cedisStockByGrupo[kBodega] = { pas: 0, act: 0 };
@@ -198,7 +216,6 @@ function actualizarTablas(ventasData, cedisData) {
     let grupoCedisCheck = {};
     let tiendaGruposCheck = {}; 
 
-    // Llenado de tablas basado en lo que el usuario filtró
     ventasData.forEach(d => {
         // --- TABLA POR GRUPO ---
         const kG = d.div + '|' + d.cat + '|' + d.grp;
@@ -244,16 +261,21 @@ function actualizarTablas(ventasData, cedisData) {
         }
     });
 
+    // ==========================================
+    // AQUÍ PASAMOS EL NÚMERO CRUDO A LA TABLA, NO EL TEXTO FORMATEADO
+    // ==========================================
     const arrG = Object.values(resG).map(i => [
-        i.div, i.cat, i.grp, formatNum(i.vp), formatNum(i.va), formatBadge(i.dif),
-        formatNum(i.s_tda_pas), formatNum(i.s_tda_act), formatNum(i.s_ced_pas), formatNum(i.s_ced_act), 
-        formatNum(i.s_tda_pas + i.s_ced_pas), formatNum(i.s_tda_act + i.s_ced_act)
+        i.div, i.cat, i.grp, 
+        i.vp, i.va, i.dif,
+        i.s_tda_pas, i.s_tda_act, i.s_ced_pas, i.s_ced_act, 
+        i.s_tda_pas + i.s_ced_pas, i.s_tda_act + i.s_ced_act
     ]);
 
     const arrT = Object.values(resT).map(i => [
-        i.catT, i.tipo, i.tda, formatNum(i.vp), formatNum(i.va), formatBadge(i.dif),
-        formatNum(i.s_tda_pas), formatNum(i.s_tda_act), formatNum(i.s_ced_pas), formatNum(i.s_ced_act),
-        formatNum(i.s_tda_pas + i.s_ced_pas), formatNum(i.s_tda_act + i.s_ced_act)
+        i.catT, i.tipo, i.tda, 
+        i.vp, i.va, i.dif,
+        i.s_tda_pas, i.s_tda_act, i.s_ced_pas, i.s_ced_act,
+        i.s_tda_pas + i.s_ced_pas, i.s_tda_act + i.s_ced_act
     ]);
 
     tablaG.clear(); tablaG.rows.add(arrG); tablaG.draw(false);
