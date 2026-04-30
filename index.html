@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel Gerencial - El Compadre / Danilos</title>
+    <title>Panel Gerencial - Carga Automática</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -13,22 +13,11 @@
         :root { --brand-red: #E1251B; --brand-blue: #012094; }
         body { background-color: #f4f6f9; font-family: 'Segoe UI', sans-serif; font-size: 0.82rem; margin: 0; padding: 0; }
         
-        #loader-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #f4f6f9; z-index: 9999; display: flex;
-            flex-direction: column; justify-content: center; align-items: center;
-        }
-        .spinner {
-            border: 8px solid #e0e0e0; border-top: 8px solid var(--brand-red);
-            border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite;
-        }
+        #loader-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(244, 246, 249, 0.9); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .spinner { border: 8px solid #e0e0e0; border-top: 8px solid var(--brand-red); border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        .brand-header {
-            background-color: white; border-bottom: 4px solid var(--brand-red); padding: 15px 20px;
-            margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex;
-            align-items: center; justify-content: space-between;
-        }
+        .brand-header { background-color: white; border-bottom: 4px solid var(--brand-red); padding: 15px 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between; }
         .logo-text { color: var(--brand-blue); font-size: 2.2rem; font-weight: 900; margin: 0; letter-spacing: -1px; }
         .slogan { color: var(--brand-red); font-size: 0.85rem; font-weight: bold; text-transform: uppercase; margin-top: 2px; }
         .period-badge { background-color: var(--brand-blue); color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 1.1rem; }
@@ -47,28 +36,28 @@
         table.dataTable tbody td { text-align: center !important; vertical-align: middle !important; }
         .nav-tabs .nav-link { font-weight: bold; color: #495057; }
         .nav-tabs .nav-link.active { color: var(--brand-blue); border-bottom: 3px solid var(--brand-blue); }
+        .col-tienda { background-color: rgba(255, 193, 7, 0.05) !important; }
+        .col-cedis { background-color: rgba(23, 162, 184, 0.05) !important; }
+        .col-total { background-color: rgba(225, 37, 27, 0.03) !important; }
+        
+        .badge-positivo { color: #0f5132; font-weight: bold; background-color: #d1e7dd; padding: 3px 8px; border-radius: 4px; }
+        .badge-negativo { color: #842029; font-weight: bold; background-color: #f8d7da; padding: 3px 8px; border-radius: 4px; }
+        .badge-neutro { color: #495057; font-weight: bold; background-color: #e9ecef; padding: 3px 8px; border-radius: 4px; }
     </style>
 </head>
-
 <body>
-    <!-- Pantalla de carga automática (se quita sola al terminar) -->
     <div id="loader-overlay">
         <div class="spinner"></div>
-        <h3 style="margin-top: 20px; color: var(--brand-blue); font-weight: bold;">Actualizando Dashboard...</h3>
-        <p id="loader-text" style="color: #6c757d;">Leyendo base de datos central</p>
+        <h3 style="margin-top: 20px; color: var(--brand-blue); font-weight: bold;">Procesando...</h3>
+        <p id="loader-text" style="color: #6c757d;">Construyendo base de datos</p>
     </div>
 
-    <!-- Cabecera -->
     <div class="brand-header">
-        <div>
-            <h1 class="logo-text">Dashboard Logístico</h1>
-            <div class="slogan">Análisis de Unidades y Saldos</div>
-        </div>
+        <div><h1 class="logo-text">Dashboard Logístico</h1><div class="slogan">Análisis de Unidades y Saldos</div></div>
         <div class="period-badge">📅 Reporte Interactivo</div>
     </div>
 
     <div class="container-fluid px-md-4" id="main-content" style="display: none;">
-        
         <div class="content-container border-top border-danger border-3">
             <h6 class="fw-bold mb-3" style="color: var(--brand-blue);">Filtros de Análisis</h6>
             <div class="row g-2">
@@ -81,13 +70,10 @@
             </div>
             <div class="row mt-2 align-items-end">
                 <div class="col-6 col-md-2"><label class="form-label fw-bold mb-0">📦 Grupo:</label><select id="f_grupo" class="form-select" multiple></select></div>
-                <div class="col-12 col-md-10 text-end mt-2">
-                    <button id="btnLimpiar" class="btn text-white fw-bold px-4" style="background-color: var(--brand-red);">Limpiar Filtros</button>
-                </div>
+                <div class="col-12 col-md-10 text-end mt-2"><button id="btnLimpiar" class="btn text-white fw-bold px-4" style="background-color: var(--brand-red);">Limpiar Filtros</button></div>
             </div>
         </div>
 
-        <!-- KPIs -->
         <div class="kpi-scroll-container mb-2">
             <div class="col-kpi"><div class="kpi-card" style="border-color: #6c757d;"><div class="kpi-title">Venta<br>Año Pasado</div><div class="kpi-value" id="kpiVtaPas">0</div></div></div>
             <div class="col-kpi"><div class="kpi-card" style="border-color: #198754;"><div class="kpi-title">Venta<br>Actual</div><div class="kpi-value" id="kpiVtaAct">0</div></div></div>
@@ -111,7 +97,9 @@
             <div class="tab-pane fade show active" id="tab-grupo">
                 <div class="table-responsive">
                     <table id="tablaGrupo" class="table table-sm table-striped table-hover align-middle w-100">
-                        <thead><tr><th>División</th><th>Categoría</th><th>Grupo</th><th>Venta<br>Ant.</th><th>Venta<br>Act.</th><th>Dif.</th><th>Saldo<br>Tienda</th><th>Saldo<br>CEDIS</th><th>Saldo<br>Total</th></tr></thead>
+                        <thead>
+                            <tr><th>División</th><th>Categoría</th><th>Grupo</th><th>Venta<br>Pasada</th><th>Venta<br>Actual</th><th>Dif.</th><th class="col-tienda">Tienda<br>Pasada</th><th class="col-tienda">Tienda<br>Actual</th><th class="col-cedis">CEDIS<br>Pasado</th><th class="col-cedis">CEDIS<br>Actual</th><th class="col-total">Total<br>Pasado</th><th class="col-total">Total<br>Actual</th></tr>
+                        </thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -119,7 +107,9 @@
             <div class="tab-pane fade" id="tab-tienda">
                 <div class="table-responsive">
                     <table id="tablaTienda" class="table table-sm table-striped table-hover align-middle w-100">
-                        <thead><tr><th>Empresa</th><th>Cat. T.</th><th>Tipo</th><th>Tienda</th><th>Venta<br>Ant.</th><th>Venta<br>Act.</th><th>Dif.</th><th>Saldo<br>Tienda</th></tr></thead>
+                        <thead>
+                            <tr><th>Cat</th><th>Tipo</th><th>Tienda</th><th>Venta<br>Pasada</th><th>Venta<br>Actual</th><th>Dif.</th><th class="col-tienda">Tienda<br>Pasada</th><th class="col-tienda">Tienda<br>Actual</th><th class="col-cedis">CEDIS<br>Pasado</th><th class="col-cedis">CEDIS<br>Actual</th><th class="col-total">Total<br>Pasado</th><th class="col-total">Total<br>Actual</th></tr>
+                        </thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -127,7 +117,6 @@
         </div>
     </div>
 
-    <!-- Librerías JS -->
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -136,8 +125,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-
-    <!-- AQUÍ LLAMAMOS A LA LÓGICA AUTOMÁTICA -->
     <script src="app.js"></script>
 </body>
 </html>
