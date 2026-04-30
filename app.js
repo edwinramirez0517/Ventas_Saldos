@@ -1,15 +1,20 @@
-// Variables globales
+// ==========================================
+// app.js - Lógica de Inyección y Procesamiento Corregida
+// ==========================================
+
 let globalData = [];
 let chart1 = null, chart2 = null, tablaG = null, tablaT = null;
 let actualizando = false;
 
-// Listas para llenar los filtros dinámicamente
 let lookups = { 
     empresa: new Set(), cat_tienda: new Set(), tipo_tienda: new Set(), 
     tienda: new Set(), division: new Set(), categoria: new Set(), grupo: new Set() 
 };
 
-function formatNum(num) { return Number(num).toLocaleString('en-US', { maximumFractionDigits: 0 }); }
+function formatNum(num) { 
+    return Number(num).toLocaleString('en-US', { maximumFractionDigits: 0 }); 
+}
+
 function formatState(state) {
     if (!state.id) return state.text;
     var $cb = $('<input type="checkbox" class="select2-checkbox">');
@@ -17,18 +22,27 @@ function formatState(state) {
     return $('<span></span>').append($cb).append(' ' + state.text);
 }
 
-// Clasificación de la información
+// 1. Clasificación estricta de empresa
 function determineEmpresa(name) {
     name = String(name).toUpperCase();
     if (name.includes('DS') || name.includes('DANILOS')) return 'DANILOS STORE';
     return 'EL COMPADRE';
 }
 
+// 2. Clasificación estricta de tipo de tienda (Corregido para evitar falsos CEDIS)
 function determineTipoTienda(name) {
     name = String(name).toUpperCase();
-    if (name.includes('CD ') || name.includes('CEDIS') || name.includes('BODEGA')) return 'CEDIS';
+    // CEDIS estricto
+    if (name.includes('CD ') || name.includes('CEDIS')) return 'CEDIS';
+    // Mayoreo (incluyendo megabodegas que antes se confundían con CEDIS)
     if (name.includes('AEC') || name.includes('DS') || name.includes('MAYOREO') || name.includes('MEGABODEGA')) return 'MAYOREO';
     return 'DETALLE';
+}
+
+// Función auxiliar para forzar números limpios (Evita perder ventas por celdas vacías)
+function cleanNumber(val) {
+    let parsed = parseFloat(val);
+    return isNaN(parsed) ? 0 : parsed;
 }
 
 $(document).ready(function () {
@@ -42,12 +56,10 @@ $(document).ready(function () {
     // ==========================================
     // EJECUCIÓN AUTOMÁTICA AL ABRIR LA PÁGINA
     // ==========================================
-    // Aquí es donde le decimos a PapaParse que busque tu archivo en GitHub
-    // El archivo debe llamarse EXACTAMENTE así y estar en la misma carpeta
     Papa.parse("reporte_ventas_unidades_2025_2026.csv", {
-        download: true, // Esto hace que lo busque en el servidor automáticamente
+        download: true,
         header: true,
-        delimiter: ";", // Ajustado para tu CSV
+        delimiter: ";", 
         skipEmptyLines: true,
         dynamicTyping: true,
         chunk: function(results) {
@@ -58,12 +70,13 @@ $(document).ready(function () {
                 const tipo = determineTipoTienda(row.Name);
                 const catT = row.Categoria_Tienda || 'N/A';
                 
-                // Inversión de Saldos como solicitaste
-                const s_ant = parseFloat(row.Saldo_Actual) || 0; 
-                const s_act = parseFloat(row.Saldo_Anterior) || 0; 
-                const v_ant = parseFloat(row.Venta_Und_Anterior) || 0;
-                const v_act = parseFloat(row.Venta_Und_Actual) || 0;
-                const dif = parseFloat(row.Diferencia_Und) || 0;
+                // 3. Limpieza absoluta de números y cruce de saldos
+                // Se invierten los saldos según tu regla de negocio
+                const s_ant = cleanNumber(row.Saldo_Actual); 
+                const s_act = cleanNumber(row.Saldo_Anterior); 
+                const v_ant = cleanNumber(row.Venta_Und_Anterior);
+                const v_act = cleanNumber(row.Venta_Und_Actual);
+                const dif = cleanNumber(row.Diferencia_Und);
 
                 lookups.empresa.add(empresa); lookups.cat_tienda.add(catT); lookups.tipo_tienda.add(tipo);
                 lookups.tienda.add(row.Name); lookups.division.add(row.Division); lookups.categoria.add(row.Categoria); lookups.grupo.add(row.Grupo);
@@ -78,10 +91,10 @@ $(document).ready(function () {
             populateSelects();
             $('#main-content').show();
             filtrarYActualizar();
-            $('#loader-overlay').hide(); // Se oculta la pantalla de carga al terminar
+            $('#loader-overlay').hide(); 
         },
         error: function(err) {
-            $('#loader-text').text("Error: Asegúrate de haber subido el archivo 'reporte_ventas_unidades_2025_2026.csv' al repositorio.");
+            $('#loader-text').text("Error leyendo el CSV. Verifica el nombre.");
             $('#loader-text').css("color", "red");
         }
     });
@@ -90,7 +103,6 @@ $(document).ready(function () {
     $('.form-select').on('change', function () { if (!actualizando) filtrarYActualizar(); });
 });
 
-// Llenar HTML Selects
 function populateSelects() {
     const keys = [{id: 'f_empresa', data: lookups.empresa}, {id: 'f_cat_tienda', data: lookups.cat_tienda}, {id: 'f_tipo_tienda', data: lookups.tipo_tienda}, {id: 'f_tienda', data: lookups.tienda}, {id: 'f_division', data: lookups.division}, {id: 'f_categoria', data: lookups.categoria}, {id: 'f_grupo', data: lookups.grupo}];
     keys.forEach(k => {
@@ -118,15 +130,28 @@ function filtrarYActualizar() {
     actualizarKPIs(filtered); actualizarGraficos(filtered); actualizarTablas(filtered); actualizando = false;
 }
 
-// Inyectar datos en KPIs HTML
 function actualizarKPIs(data) {
     let v_ant = 0, v_act = 0, dif = 0, s_tda = 0, s_cedis = 0;
-    data.forEach(d => { v_ant += d.v_ant; v_act += d.v_act; dif += d.dif; if (d.is_cedis) s_cedis += d.s_act; else s_tda += d.s_act; });
-    $('#kpiVtaPas').text(formatNum(v_ant)); $('#kpiVtaAct').text(formatNum(v_act)); $('#kpiDifVta').text(formatNum(dif));
-    $('#kpiSaldTienda').text(formatNum(s_tda)); $('#kpiSaldCedis').text(formatNum(s_cedis)); $('#kpiSaldTotal').text(formatNum(s_tda + s_cedis));
+    data.forEach(d => { 
+        v_ant += d.v_ant; 
+        v_act += d.v_act; 
+        dif += d.dif; 
+        
+        // Sumar saldos actuales invertidos
+        if (d.is_cedis) {
+            s_cedis += d.s_act; 
+        } else {
+            s_tda += d.s_act; 
+        }
+    });
+    $('#kpiVtaPas').text(formatNum(v_ant)); 
+    $('#kpiVtaAct').text(formatNum(v_act)); 
+    $('#kpiDifVta').text(formatNum(dif));
+    $('#kpiSaldTienda').text(formatNum(s_tda)); 
+    $('#kpiSaldCedis').text(formatNum(s_cedis)); 
+    $('#kpiSaldTotal').text(formatNum(s_tda + s_cedis));
 }
 
-// Inyectar datos en Tablas HTML
 function actualizarTablas(data) {
     let resG = {}, resT = {};
     data.forEach(d => {
@@ -147,7 +172,6 @@ function actualizarTablas(data) {
     tablaT.clear(); tablaT.rows.add(arrT); tablaT.draw(false);
 }
 
-// Inyectar datos en Gráficos HTML
 function actualizarGraficos(data) {
     let catMap = {}, divMap = {};
     data.forEach(d => { catMap[d.cat] = (catMap[d.cat] || 0) + d.v_act; divMap[d.div] = (divMap[d.div] || 0) + d.v_act; });
