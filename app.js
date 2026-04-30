@@ -1,3 +1,7 @@
+// ==========================================
+// app.js - Lógica Dinámica y Corrección de CEDIS
+// ==========================================
+
 let globalData = [];
 let chart1 = null, chart2 = null, tablaG = null, tablaT = null;
 let actualizando = false;
@@ -7,11 +11,14 @@ let lookups = {
     tienda: new Set(), division: new Set(), categoria: new Set(), grupo: new Set() 
 };
 
-function formatNum(num) { return Number(num).toLocaleString('en-US', { maximumFractionDigits: 0 }); }
+function formatNum(num) { 
+    return Number(num).toLocaleString('en-US', { maximumFractionDigits: 0 }); 
+}
+
 function formatBadge(num) {
-    if (num > 0) return `<span class="badge-positivo">${formatNum(num)}</span>`;
-    if (num < 0) return `<span class="badge-negativo">${formatNum(num)}</span>`;
-    return `<span class="badge-neutro">0</span>`;
+    if (num > 0) return `<span class="badge-positivo" style="color: #0f5132; font-weight: bold; background-color: #d1e7dd; padding: 3px 8px; border-radius: 4px;">${formatNum(num)}</span>`;
+    if (num < 0) return `<span class="badge-negativo" style="color: #842029; font-weight: bold; background-color: #f8d7da; padding: 3px 8px; border-radius: 4px;">${formatNum(num)}</span>`;
+    return `<span class="badge-neutro" style="color: #495057; font-weight: bold; background-color: #e9ecef; padding: 3px 8px; border-radius: 4px;">0</span>`;
 }
 
 function formatState(state) {
@@ -21,19 +28,11 @@ function formatState(state) {
     return $('<span></span>').append($cb).append(' ' + state.text);
 }
 
-// 1. REGLA DE EMPRESA: Danilos tiene 'VITRINA' o 'DS', los demás son El Compadre.
+// 1. REGLA EMPRESA
 function determineEmpresa(name) {
     name = String(name).toUpperCase();
     if (name.includes('DS') || name.includes('VITRINA')) return 'DANILOS STORE';
     return 'EL COMPADRE';
-}
-
-// 2. REGLA DE TIPO DE TIENDA: Mayoreo son las que dicen Mayoreo/Megabodega. CEDIS es CD/CEDIS.
-function determineTipoTienda(name) {
-    name = String(name).toUpperCase();
-    if (name.includes('CD ') || name.includes('CEDIS')) return 'CEDIS';
-    if (name.includes('MAYOREO') || name.includes('MEGABODEGA')) return 'MAYOREO';
-    return 'DETALLE';
 }
 
 function cleanNumber(val) {
@@ -69,25 +68,33 @@ $(document).ready(function () {
                 
                 if (!tdaName || !grpName) return; 
                 
-                const empresa = determineEmpresa(tdaName);
-                const tipoClasificacion = determineTipoTienda(tdaName);
-                const isCedisInterno = (tipoClasificacion === 'CEDIS');
-                
-                // REGLA DE FILTRO: El filtro no debe decir CEDIS, debe decir MAYOREO o DETALLE
-                let tipoFilter = tipoClasificacion;
-                if (isCedisInterno) tipoFilter = 'MAYOREO'; 
-                
+                const upperName = String(tdaName).toUpperCase();
+                const empresa = determineEmpresa(upperName);
                 const catT = getColValue(row, ['Categoria_Tienda', 'categoria_tienda', 'Cat_Tienda', 'Categoria Tienda']) || 'N/A';
+                
+                // =========================================================
+                // CORRECCIÓN CRÍTICA DE LÓGICA (Separar Bodega de Filtro)
+                // =========================================================
+                
+                // A) ¿Actúa como un CEDIS/Almacén para los cálculos de inventario?
+                const isCedisInterno = upperName.includes('CD ') || upperName.includes('CEDIS') || upperName.includes('MEGABODEGA') || String(catT).toUpperCase() === 'ALMACEN';
+                
+                // B) ¿Bajo qué nombre debe salir en el Filtro Desplegable del usuario? (Solo Mayoreo/Detalle)
+                let tipoFilter = 'DETALLE';
+                if (upperName.includes('MAYOREO') || upperName.includes('MEGABODEGA') || upperName.includes('AEC') || upperName.includes('DS') || isCedisInterno) {
+                    tipoFilter = 'MAYOREO';
+                }
+                
                 const div = getColValue(row, ['Division', 'division', 'DIVISION']) || 'N/A';
                 const cat = getColValue(row, ['Categoria', 'categoria', 'CATEGORIA']) || 'N/A';
                 
-                // Invertimos Pasado y Actual
+                // C) Lectura invertida de saldos
                 let s_act = 0, s_ant = 0;
                 if (row['saldo_actual'] !== undefined || row['saldo_pasado'] !== undefined) {
                     s_act = cleanNumber(row['saldo_actual']); s_ant = cleanNumber(row['saldo_pasado']);
                 } else {
-                    s_act = cleanNumber(row['Saldo_Anterior'] || row['Saldo Anterior']);
-                    s_ant = cleanNumber(row['Saldo_Actual'] || row['Saldo Actual']);
+                    s_act = cleanNumber(getColValue(row, ['Saldo_Anterior', 'Saldo Anterior']));
+                    s_ant = cleanNumber(getColValue(row, ['Saldo_Actual', 'Saldo Actual']));
                 }
 
                 const v_act = cleanNumber(getColValue(row, ['Venta_Und_Actual', 'venta_actual', 'Venta Actual', 'VENTA_ACTUAL']));
@@ -95,11 +102,11 @@ $(document).ready(function () {
                 const dif = cleanNumber(getColValue(row, ['Diferencia_Und', 'diferencia', 'Diferencia Und', 'DIFERENCIA']));
 
                 lookups.empresa.add(empresa); lookups.cat_tienda.add(catT); 
-                lookups.tipo_tienda.add(tipoFilter); // El dropdown solo recibe Mayoreo y Detalle
+                lookups.tipo_tienda.add(tipoFilter); // El dropdown será limpio
                 lookups.tienda.add(tdaName); lookups.division.add(div); lookups.categoria.add(cat); lookups.grupo.add(grpName);
 
                 globalData.push({
-                    emp: empresa, catT: catT, tipoFiltro: tipoFilter, tipoReal: tipoClasificacion, 
+                    emp: empresa, catT: catT, tipoFiltro: tipoFilter, 
                     tda: tdaName, div: div, cat: cat, grp: grpName,
                     s_ant: s_ant, s_act: s_act, v_ant: v_ant, v_act: v_act, dif: dif, is_cedis: isCedisInterno
                 });
@@ -112,7 +119,7 @@ $(document).ready(function () {
             $('#loader-overlay').hide(); 
         },
         error: function(err) {
-            $('#loader-text').text("Error leyendo el CSV. Verifica el nombre del archivo.");
+            $('#loader-text').text("Error leyendo el CSV. Asegúrate de que el nombre del archivo coincida.");
             $('#loader-text').css("color", "red");
         }
     });
@@ -162,18 +169,19 @@ function actualizarTablas(data) {
     let resG = {}, resT = {};
     let cedisStockByGrupo = {};
 
-    // 1er paso: Guardar el inventario total del CEDIS por cada grupo
+    // 1er paso: Rescatar el inventario de las bodegas/almacenes/cedis
     data.forEach(d => {
         if (d.is_cedis) {
-            if (!cedisStockByGrupo[d.grp]) cedisStockByGrupo[d.grp] = { pas: 0, act: 0 };
-            cedisStockByGrupo[d.grp].pas += d.s_ant;
-            cedisStockByGrupo[d.grp].act += d.s_act;
+            const kBodega = d.emp + '|' + d.grp; // Agrupado por empresa y grupo
+            if (!cedisStockByGrupo[kBodega]) cedisStockByGrupo[kBodega] = { pas: 0, act: 0 };
+            cedisStockByGrupo[kBodega].pas += d.s_ant;
+            cedisStockByGrupo[kBodega].act += d.s_act;
         }
     });
 
     let tiendaGruposCheck = {}; 
 
-    // 2do paso: Construir las tablas
+    // 2do paso: Llenar las tablas asignando los saldos correctamente
     data.forEach(d => {
         // --- TABLA POR GRUPO ---
         const kG = d.div + '|' + d.cat + '|' + d.grp;
@@ -182,22 +190,28 @@ function actualizarTablas(data) {
         if(d.is_cedis) { resG[kG].s_ced_pas += d.s_ant; resG[kG].s_ced_act += d.s_act; } 
         else { resG[kG].s_tda_pas += d.s_ant; resG[kG].s_tda_act += d.s_act; }
 
-        // --- TABLA POR TIENDA (Ignoramos los registros CEDIS como fila independiente, igual que en tu imagen) ---
-        if (!d.is_cedis) {
-            const kT = d.catT + '|' + d.tipoReal + '|' + d.tda;
-            if(!resT[kT]) {
-                resT[kT] = {catT: d.catT, tipo: d.tipoReal, tda: d.tda, va:0, vc:0, dif:0, s_tda_pas:0, s_tda_act:0, s_ced_pas:0, s_ced_act:0};
-                tiendaGruposCheck[kT] = new Set();
-            }
-            resT[kT].va += d.v_ant; resT[kT].vc += d.v_act; resT[kT].dif += d.dif;
+        // --- TABLA POR TIENDA ---
+        const kT = d.catT + '|' + d.tipoFiltro + '|' + d.tda;
+        if(!resT[kT]) {
+            resT[kT] = {emp: d.emp, catT: d.catT, tipo: d.tipoFiltro, tda: d.tda, isCedisRow: d.is_cedis, va:0, vc:0, dif:0, s_tda_pas:0, s_tda_act:0, s_ced_pas:0, s_ced_act:0};
+            tiendaGruposCheck[kT] = new Set();
+        }
+        resT[kT].va += d.v_ant; resT[kT].vc += d.v_act; resT[kT].dif += d.dif;
+        
+        if (d.is_cedis) {
+            // Si la línea ES el CEDIS/Megabodega, su saldo va a las columnas de CEDIS. Tienda queda en 0.
+            resT[kT].s_ced_pas += d.s_ant; resT[kT].s_ced_act += d.s_act;
+        } else {
+            // Si la línea es una Tienda normal, su saldo va a la columna de Tienda
             resT[kT].s_tda_pas += d.s_ant; resT[kT].s_tda_act += d.s_act;
             
-            // Cruzamos el inventario del CEDIS de este grupo para sumarlo a la tienda (Solo una vez por grupo)
-            if (!tiendaGruposCheck[kT].has(d.grp)) {
-                tiendaGruposCheck[kT].add(d.grp);
-                if (cedisStockByGrupo[d.grp]) {
-                    resT[kT].s_ced_pas += cedisStockByGrupo[d.grp].pas;
-                    resT[kT].s_ced_act += cedisStockByGrupo[d.grp].act;
+            // Le adjuntamos el saldo de su CEDIS respectivo para los grupos que vende
+            const kBodega = d.emp + '|' + d.grp;
+            if (!tiendaGruposCheck[kT].has(kBodega)) {
+                tiendaGruposCheck[kT].add(kBodega);
+                if (cedisStockByGrupo[kBodega]) {
+                    resT[kT].s_ced_pas += cedisStockByGrupo[kBodega].pas;
+                    resT[kT].s_ced_act += cedisStockByGrupo[kBodega].act;
                 }
             }
         }
