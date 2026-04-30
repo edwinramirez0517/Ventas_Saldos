@@ -1,5 +1,5 @@
 // ==========================================
-// app.js - Lógica Dinámica y Filtros Inteligentes (Versión Visual Final)
+// app.js - Lógica Dinámica y Filtros Inteligentes (Versión Ejecutiva)
 // ==========================================
 
 let globalData = [];
@@ -15,11 +15,19 @@ function formatNum(num) {
     return Number(num).toLocaleString('en-US', { maximumFractionDigits: 0 }); 
 }
 
-// Estilo visual mejorado para positivos y negativos
+// Formato de badge para la tabla (más relleno)
 function formatBadge(num) {
     if (num > 0) return `<span style="color: #0f5132; font-weight: 800; background-color: #d1e7dd; padding: 4px 10px; border-radius: 6px;">+${formatNum(num)}</span>`;
     if (num < 0) return `<span style="color: #842029; font-weight: 800; background-color: #f8d7da; padding: 4px 10px; border-radius: 6px;">${formatNum(num)}</span>`;
     return `<span style="color: #495057; font-weight: bold; background-color: #e9ecef; padding: 4px 10px; border-radius: 6px;">0</span>`;
+}
+
+// Formato de mini-badge para las tarjetas (más elegante y ejecutivo)
+function formatSubBadge(num) {
+    let style = "font-weight: 800; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;";
+    if (num > 0) return `<span style="${style} color: #0f5132; background-color: #d1e7dd;">+${formatNum(num)}</span>`;
+    if (num < 0) return `<span style="${style} color: #842029; background-color: #f8d7da;">${formatNum(num)}</span>`;
+    return `<span style="${style} color: #495057; background-color: #e9ecef;">0</span>`;
 }
 
 function formatState(state) {
@@ -51,33 +59,29 @@ $(document).ready(function () {
     Chart.register(ChartDataLabels);
     $('.form-select').select2({ theme: 'bootstrap-5', placeholder: 'Todas...', allowClear: true, closeOnSelect: false, templateResult: formatState });
 
-    // ==========================================
-    // ESTILOS VISUALES PARA LAS COLUMNAS DE LA TABLA
-    // ==========================================
     const conf = { 
         language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json' }, 
         pageLength: 20, 
         deferRender: true,
         columnDefs: [
             {
-                targets: [3, 4, 6, 7, 8, 9, 10, 11], // Columnas numéricas
+                targets: [3, 4, 6, 7, 8, 9, 10, 11],
                 render: function (data, type) {
                     if (type === 'display') return formatNum(data);
                     return data; 
                 }
             },
             {
-                targets: [5], // Diferencia
+                targets: [5], 
                 render: function (data, type) {
                     if (type === 'display') return formatBadge(data);
                     return data; 
                 }
             },
-            // Aplicar colores de fondo a todo el cuerpo de las columnas
             { targets: [6, 7], className: 'col-tienda text-center align-middle' },
             { targets: [8, 9], className: 'col-cedis text-center align-middle' },
             { targets: [10, 11], className: 'col-total text-center align-middle' },
-            { targets: '_all', className: 'text-center align-middle' } // Centrar lo demás
+            { targets: '_all', className: 'text-center align-middle' } 
         ]
     };
     
@@ -96,7 +100,6 @@ $(document).ready(function () {
                 const grpName = getColValue(row, ['Grupo', 'grupo', 'GRUPO']);
                 
                 if (!tdaName || !grpName) return; 
-                
                 const upperName = String(tdaName).toUpperCase();
                 
                 if (upperName.includes('MEGATIENDA#2-AEC-DS')) return; 
@@ -188,22 +191,42 @@ function filtrarYActualizar() {
 }
 
 function actualizarKPIs(ventasData, cedisData) {
-    let v_pas = 0, v_act = 0, dif = 0, s_tda_act = 0;
+    let v_pas = 0, v_act = 0, dif = 0;
+    let s_tda_pas = 0, s_tda_act = 0;
     
     ventasData.forEach(d => { 
         v_pas += d.v_pas; v_act += d.v_act; dif += d.dif; 
-        if (!d.is_cedis) s_tda_act += d.s_act; 
+        if (!d.is_cedis) {
+            s_tda_pas += d.s_pas;
+            s_tda_act += d.s_act; 
+        }
     });
     
-    let s_cedis_act = 0;
-    cedisData.forEach(d => { s_cedis_act += d.s_act; });
+    let s_cedis_pas = 0, s_cedis_act = 0;
+    cedisData.forEach(d => { 
+        s_cedis_pas += d.s_pas;
+        s_cedis_act += d.s_act; 
+    });
 
     $('#kpiVtaPas').text(formatNum(v_pas)); 
     $('#kpiVtaAct').text(formatNum(v_act)); 
     $('#kpiDifVta').text(formatNum(dif));
+    
     $('#kpiSaldTienda').text(formatNum(s_tda_act)); 
     $('#kpiSaldCedis').text(formatNum(s_cedis_act)); 
     $('#kpiSaldTotal').text(formatNum(s_tda_act + s_cedis_act));
+
+    // ==========================================
+    // INYECCIÓN DE LA ETIQUETA DE DIFERENCIA EN SALDOS
+    // ==========================================
+    let dif_tda = s_tda_act - s_tda_pas;
+    let dif_cedis = s_cedis_act - s_cedis_pas;
+    let dif_total = (s_tda_act + s_cedis_act) - (s_tda_pas + s_cedis_pas);
+
+    let textoAyuda = '<span style="font-size: 0.70rem; color: #a1a1a1; margin-left: 5px; font-weight: bold;">vs Anterior</span>';
+    $('#kpiDifSaldTienda').html(formatSubBadge(dif_tda) + textoAyuda);
+    $('#kpiDifSaldCedis').html(formatSubBadge(dif_cedis) + textoAyuda);
+    $('#kpiDifSaldTotal').html(formatSubBadge(dif_total) + textoAyuda);
 }
 
 function actualizarTablas(ventasData, cedisData) {
@@ -264,15 +287,13 @@ function actualizarTablas(ventasData, cedisData) {
     });
 
     const arrG = Object.values(resG).map(i => [
-        i.div, i.cat, i.grp, 
-        i.vp, i.va, i.dif,
+        i.div, i.cat, i.grp, i.vp, i.va, i.dif,
         i.s_tda_pas, i.s_tda_act, i.s_ced_pas, i.s_ced_act, 
         i.s_tda_pas + i.s_ced_pas, i.s_tda_act + i.s_ced_act
     ]);
 
     const arrT = Object.values(resT).map(i => [
-        i.catT, i.tipo, i.tda, 
-        i.vp, i.va, i.dif,
+        i.catT, i.tipo, i.tda, i.vp, i.va, i.dif,
         i.s_tda_pas, i.s_tda_act, i.s_ced_pas, i.s_ced_act,
         i.s_tda_pas + i.s_ced_pas, i.s_tda_act + i.s_ced_act
     ]);
