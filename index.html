@@ -39,10 +39,6 @@
         .col-tienda { background-color: rgba(255, 193, 7, 0.05) !important; }
         .col-cedis { background-color: rgba(23, 162, 184, 0.05) !important; }
         .col-total { background-color: rgba(225, 37, 27, 0.03) !important; }
-        
-        .badge-positivo { color: #0f5132; font-weight: bold; background-color: #d1e7dd; padding: 3px 8px; border-radius: 4px; }
-        .badge-negativo { color: #842029; font-weight: bold; background-color: #f8d7da; padding: 3px 8px; border-radius: 4px; }
-        .badge-neutro { color: #495057; font-weight: bold; background-color: #e9ecef; padding: 3px 8px; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -74,13 +70,33 @@
             </div>
         </div>
 
+        <!-- KPIs con Etiquetas de Tendencia (Diferencias) -->
         <div class="kpi-scroll-container mb-2">
             <div class="col-kpi"><div class="kpi-card" style="border-color: #6c757d;"><div class="kpi-title">Venta<br>Año Pasado</div><div class="kpi-value" id="kpiVtaPas">0</div></div></div>
             <div class="col-kpi"><div class="kpi-card" style="border-color: #198754;"><div class="kpi-title">Venta<br>Actual</div><div class="kpi-value" id="kpiVtaAct">0</div></div></div>
             <div class="col-kpi"><div class="kpi-card" style="border-color: var(--brand-blue);"><div class="kpi-title">Diferencia<br>Ventas</div><div class="kpi-value" id="kpiDifVta">0</div></div></div>
-            <div class="col-kpi"><div class="kpi-card" style="border-color: #ffc107;"><div class="kpi-title text-warning">Saldo<br>Tienda</div><div class="kpi-value" id="kpiSaldTienda">0</div></div></div>
-            <div class="col-kpi"><div class="kpi-card" style="border-color: #17a2b8;"><div class="kpi-title text-info">Saldo<br>CEDIS</div><div class="kpi-value" id="kpiSaldCedis">0</div></div></div>
-            <div class="col-kpi"><div class="kpi-card" style="border-color: var(--brand-red);"><div class="kpi-title text-danger">Saldo<br>Total</div><div class="kpi-value" id="kpiSaldTotal">0</div></div></div>
+            
+            <div class="col-kpi">
+                <div class="kpi-card" style="border-color: #ffc107;">
+                    <div class="kpi-title text-warning">Saldo<br>Tienda</div>
+                    <div class="kpi-value" id="kpiSaldTienda">0</div>
+                    <div class="mt-2" id="kpiDifSaldTienda"></div>
+                </div>
+            </div>
+            <div class="col-kpi">
+                <div class="kpi-card" style="border-color: #17a2b8;">
+                    <div class="kpi-title text-info">Saldo<br>CEDIS</div>
+                    <div class="kpi-value" id="kpiSaldCedis">0</div>
+                    <div class="mt-2" id="kpiDifSaldCedis"></div>
+                </div>
+            </div>
+            <div class="col-kpi">
+                <div class="kpi-card" style="border-color: var(--brand-red);">
+                    <div class="kpi-title text-danger">Saldo<br>Total</div>
+                    <div class="kpi-value" id="kpiSaldTotal">0</div>
+                    <div class="mt-2" id="kpiDifSaldTotal"></div>
+                </div>
+            </div>
         </div>
 
         <div class="row mb-4">
