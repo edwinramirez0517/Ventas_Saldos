@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel Gerencial - Carga Automática</title>
+    <title>Panel Gerencial - Ejecutivo</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -23,22 +23,41 @@
         .period-badge { background-color: var(--brand-blue); color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 1.1rem; }
 
         .content-container { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        
+        /* TARJETAS KPI CON FONDOS DEGRADADOS Y SOMBRAS */
         .kpi-scroll-container { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 15px; padding-bottom: 15px; }
         .col-kpi { flex: 0 0 auto; width: 160px; }
         @media (min-width: 1200px) { .kpi-scroll-container { flex-wrap: wrap; } .col-kpi { flex: 1 1 0; width: auto; } }
 
-        .kpi-card { background: white; border-radius: 10px; padding: 12px; border-left: 5px solid var(--brand-blue); height: 100%; display: flex; flex-direction: column; justify-content: center; }
-        .kpi-title { font-size: 0.70rem; color: #6c757d; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; line-height: 1.1; }
-        .kpi-value { font-size: 1.4rem; font-weight: bold; color: #212529; }
+        .kpi-card { border-radius: 10px; padding: 15px 12px; height: 100%; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.08); transition: transform 0.2s ease, box-shadow 0.2s ease; border: none; }
+        .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 8px 12px rgba(0,0,0,0.15); }
+        
+        /* Colores Específicos por Tarjeta */
+        .bg-vta-pas { background: linear-gradient(135deg, #f8f9fa, #e9ecef); border-left: 5px solid #6c757d; }
+        .bg-vta-act { background: linear-gradient(135deg, #d1e7dd, #badce3); border-left: 5px solid #198754; }
+        .bg-dif { background: linear-gradient(135deg, #cfe2ff, #b6d4fe); border-left: 5px solid var(--brand-blue); }
+        .bg-sld-tda { background: linear-gradient(135deg, #fff3cd, #ffecb5); border-left: 5px solid #ffc107; }
+        .bg-sld-ced { background: linear-gradient(135deg, #cff4fc, #b6effb); border-left: 5px solid #17a2b8; }
+        .bg-sld-tot { background: linear-gradient(135deg, #f8d7da, #f1c2c6); border-left: 5px solid var(--brand-red); }
 
+        .kpi-title { font-size: 0.70rem; color: #495057; text-transform: uppercase; font-weight: 800; margin-bottom: 5px; line-height: 1.1; }
+        .kpi-value { font-size: 1.5rem; font-weight: 900; color: #212529; }
+
+        /* TABLAS: EFECTOS HOVER Y COLUMNAS RESALTADAS */
         .table-responsive { max-height: 550px; overflow-y: auto; border-radius: 8px; border: 1px solid #dee2e6; }
         table.dataTable thead th { position: sticky !important; top: 0 !important; z-index: 1000 !important; background-color: var(--brand-blue) !important; color: white !important; text-align: center !important; }
-        table.dataTable tbody td { text-align: center !important; vertical-align: middle !important; }
+        table.dataTable tbody td { text-align: center !important; vertical-align: middle !important; transition: background-color 0.2s ease; }
+        
+        /* Iluminar toda la fila al pasar el mouse */
+        table.dataTable tbody tr:hover td { background-color: rgba(1, 32, 148, 0.12) !important; color: var(--brand-blue); font-weight: bold; cursor: pointer; }
+
+        /* Resaltes de columnas */
+        .col-tienda { background-color: rgba(255, 193, 7, 0.08) !important; }
+        .col-cedis { background-color: rgba(23, 162, 184, 0.08) !important; }
+        .col-total { background-color: rgba(225, 37, 27, 0.15) !important; font-weight: 900 !important; color: var(--brand-red); font-size: 0.85rem;}
+        
         .nav-tabs .nav-link { font-weight: bold; color: #495057; }
         .nav-tabs .nav-link.active { color: var(--brand-blue); border-bottom: 3px solid var(--brand-blue); }
-        .col-tienda { background-color: rgba(255, 193, 7, 0.05) !important; }
-        .col-cedis { background-color: rgba(23, 162, 184, 0.05) !important; }
-        .col-total { background-color: rgba(225, 37, 27, 0.03) !important; }
     </style>
 </head>
 <body>
@@ -70,33 +89,14 @@
             </div>
         </div>
 
-        <!-- KPIs con Etiquetas de Tendencia (Diferencias) -->
         <div class="kpi-scroll-container mb-2">
-            <div class="col-kpi"><div class="kpi-card" style="border-color: #6c757d;"><div class="kpi-title">Venta<br>Año Pasado</div><div class="kpi-value" id="kpiVtaPas">0</div></div></div>
-            <div class="col-kpi"><div class="kpi-card" style="border-color: #198754;"><div class="kpi-title">Venta<br>Actual</div><div class="kpi-value" id="kpiVtaAct">0</div></div></div>
-            <div class="col-kpi"><div class="kpi-card" style="border-color: var(--brand-blue);"><div class="kpi-title">Diferencia<br>Ventas</div><div class="kpi-value" id="kpiDifVta">0</div></div></div>
+            <div class="col-kpi"><div class="kpi-card bg-vta-pas"><div class="kpi-title">Venta<br>Año Pasado</div><div class="kpi-value" id="kpiVtaPas">0</div></div></div>
+            <div class="col-kpi"><div class="kpi-card bg-vta-act"><div class="kpi-title text-success">Venta<br>Actual</div><div class="kpi-value" id="kpiVtaAct">0</div></div></div>
+            <div class="col-kpi"><div class="kpi-card bg-dif"><div class="kpi-title text-primary">Diferencia<br>Ventas</div><div class="kpi-value" id="kpiDifVta">0</div></div></div>
             
-            <div class="col-kpi">
-                <div class="kpi-card" style="border-color: #ffc107;">
-                    <div class="kpi-title text-warning">Saldo<br>Tienda</div>
-                    <div class="kpi-value" id="kpiSaldTienda">0</div>
-                    <div class="mt-2" id="kpiDifSaldTienda"></div>
-                </div>
-            </div>
-            <div class="col-kpi">
-                <div class="kpi-card" style="border-color: #17a2b8;">
-                    <div class="kpi-title text-info">Saldo<br>CEDIS</div>
-                    <div class="kpi-value" id="kpiSaldCedis">0</div>
-                    <div class="mt-2" id="kpiDifSaldCedis"></div>
-                </div>
-            </div>
-            <div class="col-kpi">
-                <div class="kpi-card" style="border-color: var(--brand-red);">
-                    <div class="kpi-title text-danger">Saldo<br>Total</div>
-                    <div class="kpi-value" id="kpiSaldTotal">0</div>
-                    <div class="mt-2" id="kpiDifSaldTotal"></div>
-                </div>
-            </div>
+            <div class="col-kpi"><div class="kpi-card bg-sld-tda"><div class="kpi-title text-warning">Saldo<br>Tienda</div><div class="kpi-value" id="kpiSaldTienda">0</div><div class="mt-2" id="kpiDifSaldTienda"></div></div></div>
+            <div class="col-kpi"><div class="kpi-card bg-sld-ced"><div class="kpi-title text-info">Saldo<br>CEDIS</div><div class="kpi-value" id="kpiSaldCedis">0</div><div class="mt-2" id="kpiDifSaldCedis"></div></div></div>
+            <div class="col-kpi"><div class="kpi-card bg-sld-tot"><div class="kpi-title text-danger">Saldo<br>Total</div><div class="kpi-value" id="kpiSaldTotal">0</div><div class="mt-2" id="kpiDifSaldTotal"></div></div></div>
         </div>
 
         <div class="row mb-4">
@@ -112,7 +112,7 @@
         <div class="tab-content content-container bg-white" style="border-top-left-radius: 0; padding-top: 15px;">
             <div class="tab-pane fade show active" id="tab-grupo">
                 <div class="table-responsive">
-                    <table id="tablaGrupo" class="table table-sm table-striped table-hover align-middle w-100">
+                    <table id="tablaGrupo" class="table table-sm table-striped align-middle w-100">
                         <thead>
                             <tr><th>División</th><th>Categoría</th><th>Grupo</th><th>Venta<br>Pasada</th><th>Venta<br>Actual</th><th>Dif.</th><th class="col-tienda">Tienda<br>Pasada</th><th class="col-tienda">Tienda<br>Actual</th><th class="col-cedis">CEDIS<br>Pasado</th><th class="col-cedis">CEDIS<br>Actual</th><th class="col-total">Total<br>Pasado</th><th class="col-total">Total<br>Actual</th></tr>
                         </thead>
@@ -122,7 +122,7 @@
             </div>
             <div class="tab-pane fade" id="tab-tienda">
                 <div class="table-responsive">
-                    <table id="tablaTienda" class="table table-sm table-striped table-hover align-middle w-100">
+                    <table id="tablaTienda" class="table table-sm table-striped align-middle w-100">
                         <thead>
                             <tr><th>Cat</th><th>Tipo</th><th>Tienda</th><th>Venta<br>Pasada</th><th>Venta<br>Actual</th><th>Dif.</th><th class="col-tienda">Tienda<br>Pasada</th><th class="col-tienda">Tienda<br>Actual</th><th class="col-cedis">CEDIS<br>Pasado</th><th class="col-cedis">CEDIS<br>Actual</th><th class="col-total">Total<br>Pasado</th><th class="col-total">Total<br>Actual</th></tr>
                         </thead>
