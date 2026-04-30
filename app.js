@@ -1,11 +1,12 @@
 // ==========================================
-// app.js - Lógica de Inyección y Procesamiento (Corregido)
+// app.js - Lógica Corregida por Tipo de Tienda (Solo Mayoreo/Detalle en Filtro)
 // ==========================================
 
 let globalData = [];
 let chart1 = null, chart2 = null, tablaG = null, tablaT = null;
 let actualizando = false;
 
+// Listas para filtros. f_tipo_tienda ya no incluirá CEDIS.
 let lookups = { 
     empresa: new Set(), cat_tienda: new Set(), tipo_tienda: new Set(), 
     tienda: new Set(), division: new Set(), categoria: new Set(), grupo: new Set() 
@@ -22,25 +23,14 @@ function formatState(state) {
     return $('<span></span>').append($cb).append(' ' + state.text);
 }
 
-// 1. Clasificación estricta de empresa
 function determineEmpresa(name) {
     name = String(name).toUpperCase();
     if (name.includes('DS') || name.includes('DANILOS')) return 'DANILOS STORE';
     return 'EL COMPADRE';
 }
 
-// 2. Clasificación estricta de tipo de tienda
-function determineTipoTienda(name) {
-    name = String(name).toUpperCase();
-    if (name.includes('CD ') || name.includes('CEDIS')) return 'CEDIS';
-    if (name.includes('AEC') || name.includes('DS') || name.includes('MAYOREO') || name.includes('MEGABODEGA')) return 'MAYOREO';
-    return 'DETALLE';
-}
-
-// 3. Limpieza profunda de los números del CSV (Esta es la solución a la pérdida de datos)
 function cleanNumber(val) {
     if (val === null || val === undefined) return 0;
-    // Convierte el valor a texto, le quita todas las comas, espacios y símbolos de moneda, y luego lo pasa a decimal.
     let cleanedString = String(val).replace(/,/g, '').replace(/\s/g, '').replace('$', '');
     let parsed = parseFloat(cleanedString);
     return isNaN(parsed) ? 0 : parsed;
@@ -55,37 +45,61 @@ $(document).ready(function () {
     tablaT = $('#tablaTienda').DataTable(conf);
 
     // ==========================================
-    // EJECUCIÓN AUTOMÁTICA AL ABRIR LA PÁGINA
+    // EJECUCIÓN AUTOMÁTICA
     // ==========================================
     Papa.parse("reporte_ventas_unidades_2025_2026.csv", {
         download: true,
         header: true,
         delimiter: ";", 
         skipEmptyLines: true,
-        dynamicTyping: false, // Desactivado para recibir siempre texto y poder limpiarlo con cleanNumber
+        dynamicTyping: false,
         chunk: function(results) {
             results.data.forEach(row => {
                 if (!row.Name || !row.Grupo) return; 
                 
                 const empresa = determineEmpresa(row.Name);
-                const tipo = determineTipoTienda(row.Name);
+                const upperName = String(row.Name).toUpperCase();
+                
+                // LÓGICA SEPARADA PARA TIPO DE TIENDA
+                
+                // 1. Vía KPI: ¿Es un CEDIS real? (Para sumar Saldo CEDIS)
+                const isCedisKpiBucket = upperName.includes('CD ') || upperName.includes('CEDIS');
+                
+                // 2. Vía Filtro: ¿Qué mostramos en el dropdown? (SOLO DETALLE O MAYOREO)
+                let tipoTiendaFilter = 'DETALLE'; // default
+                if (upperName.includes('AEC') || upperName.includes('DS') || upperName.includes('MAYOREO') || upperName.includes('MEGABODEGA')) {
+                    tipoTiendaFilter = 'MAYOREO';
+                } else if (isCedisKpiBucket) {
+                    // Si es CD Evelyn, etc., lo agrupamos bajo 'MAYOREO' para el filtro del usuario
+                    tipoTiendaFilter = 'MAYOREO'; 
+                }
+                
                 const catT = row.Categoria_Tienda || 'N/A';
                 
-                // Limpieza de números (Removiendo comas y evitando errores de cálculo)
-                // Se invierten los saldos: El anterior pasa a actual.
                 const s_ant = cleanNumber(row.Saldo_Actual); 
                 const s_act = cleanNumber(row.Saldo_Anterior); 
-                
                 const v_ant = cleanNumber(row.Venta_Und_Anterior);
                 const v_act = cleanNumber(row.Venta_Und_Actual);
                 const dif = cleanNumber(row.Diferencia_Und);
 
-                lookups.empresa.add(empresa); lookups.cat_tienda.add(catT); lookups.tipo_tienda.add(tipo);
-                lookups.tienda.add(row.Name); lookups.division.add(row.Division); lookups.categoria.add(row.Categoria); lookups.grupo.add(row.Grupo);
+                // Llenamos los filtros
+                lookups.empresa.add(empresa); 
+                lookups.cat_tienda.add(catT); 
+                // AQUÍ ESTÁ EL CAMBIO: f_tipo_tienda solo recibirá DETALLE o MAYOREO
+                lookups.tipo_tienda.add(tipoTiendaFilter); 
+                lookups.tienda.add(row.Name); 
+                lookups.division.add(row.Division); 
+                lookups.categoria.add(row.Categoria); 
+                lookups.grupo.add(row.Grupo);
 
                 globalData.push({
-                    emp: empresa, catT: catT, tipo: tipo, tda: row.Name, div: row.Division, cat: row.Categoria, grp: row.Grupo,
-                    s_ant: s_ant, s_act: s_act, v_ant: v_ant, v_act: v_act, dif: dif, is_cedis: tipo === 'CEDIS'
+                    emp: empresa, catT: catT, 
+                    // Guardamos la clasificación del filtro en 'tipo'
+                    tipo: tipoTiendaFilter, 
+                    tda: row.Name, div: row.Division, cat: row.Categoria, grp: row.Grupo,
+                    s_ant: s_ant, s_act: s_act, v_ant: v_ant, v_act: v_act, dif: dif, 
+                    // Guardamos la clasificación interna del KPI en 'is_cedis'
+                    is_cedis: isCedisKpiBucket 
                 });
             });
         },
@@ -96,7 +110,7 @@ $(document).ready(function () {
             $('#loader-overlay').hide(); 
         },
         error: function(err) {
-            $('#loader-text').text("Error leyendo el CSV. Verifica que el archivo reporte_ventas_unidades_2025_2026.csv exista.");
+            $('#loader-text').text("Error leyendo el CSV.");
             $('#loader-text').css("color", "red");
         }
     });
@@ -106,6 +120,7 @@ $(document).ready(function () {
 });
 
 function populateSelects() {
+    // f_tipo_tienda se llenará solo con DETALLE/MAYOREO porque lookups.tipo_tienda ya no tiene 'CEDIS'
     const keys = [{id: 'f_empresa', data: lookups.empresa}, {id: 'f_cat_tienda', data: lookups.cat_tienda}, {id: 'f_tipo_tienda', data: lookups.tipo_tienda}, {id: 'f_tienda', data: lookups.tienda}, {id: 'f_division', data: lookups.division}, {id: 'f_categoria', data: lookups.categoria}, {id: 'f_grupo', data: lookups.grupo}];
     keys.forEach(k => {
         const select = $(`#${k.id}`); select.empty();
@@ -122,6 +137,7 @@ function filtrarYActualizar() {
     let filtered = globalData.filter(d => {
         if (f.emp.length && !f.emp.includes(d.emp)) return false;
         if (f.catT.length && !f.catT.includes(d.catT)) return false;
+        // El filtro de tipo de tienda funciona contra la clasificación DETALLE/MAYOREO
         if (f.tipo.length && !f.tipo.includes(d.tipo)) return false;
         if (f.tda.length && !f.tda.includes(d.tda)) return false;
         if (f.div.length && !f.div.includes(d.div)) return false;
@@ -139,6 +155,7 @@ function actualizarKPIs(data) {
         v_act += d.v_act; 
         dif += d.dif; 
         
+        // Sumamos saldos usando la clasificación interna is_cedis
         if (d.is_cedis) {
             s_cedis += d.s_act; 
         } else {
@@ -162,6 +179,7 @@ function actualizarTablas(data) {
         resG[kG].va += d.v_ant; resG[kG].vc += d.v_act; resG[kG].dif += d.dif;
         if(d.is_cedis) resG[kG].s_ced += d.s_act; else resG[kG].s_tda += d.s_act;
 
+        // La tabla de tiendas también mostrará la clasificación DETALLE/MAYOREO en la columna tipo
         const kT = d.emp + '|' + d.catT + '|' + d.tipo + '|' + d.tda;
         if(!resT[kT]) resT[kT] = {emp: d.emp, catT: d.catT, tipo: d.tipo, tda: d.tda, va:0, vc:0, dif:0, s_act:0};
         resT[kT].va += d.v_ant; resT[kT].vc += d.v_act; resT[kT].dif += d.dif; resT[kT].s_act += d.s_act;
