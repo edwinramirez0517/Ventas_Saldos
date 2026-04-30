@@ -1,5 +1,5 @@
 // ==========================================
-// app.js - Lógica Dinámica y Corrección de CEDIS
+// app.js - Lógica Dinámica y Filtros Inteligentes
 // ==========================================
 
 let globalData = [];
@@ -69,17 +69,17 @@ $(document).ready(function () {
                 if (!tdaName || !grpName) return; 
                 
                 const upperName = String(tdaName).toUpperCase();
+                
+                // ==========================================
+                // EXCLUSIÓN DE TIENDA FANTASMA
+                // ==========================================
+                if (upperName.includes('MEGATIENDA#2-AEC-DS')) return; 
+
                 const empresa = determineEmpresa(upperName);
                 const catT = getColValue(row, ['Categoria_Tienda', 'categoria_tienda', 'Cat_Tienda', 'Categoria Tienda']) || 'N/A';
                 
-                // =========================================================
-                // LÓGICA DE CLASIFICACIÓN
-                // =========================================================
-                
-                // A) ¿Actúa como un CEDIS/Almacén para los cálculos de inventario?
                 const isCedisInterno = upperName.includes('CD ') || upperName.includes('CEDIS') || upperName.includes('MEGABODEGA') || String(catT).toUpperCase() === 'ALMACEN';
                 
-                // B) ¿Bajo qué nombre debe salir en el Filtro Desplegable? (Solo Mayoreo/Detalle)
                 let tipoFilter = 'DETALLE';
                 if (upperName.includes('MAYOREO') || upperName.includes('MEGABODEGA') || isCedisInterno) {
                     tipoFilter = 'MAYOREO';
@@ -88,7 +88,6 @@ $(document).ready(function () {
                 const div = getColValue(row, ['Division', 'division', 'DIVISION']) || 'N/A';
                 const cat = getColValue(row, ['Categoria', 'categoria', 'CATEGORIA']) || 'N/A';
                 
-                // C) Lectura lineal directa sin inversión
                 const s_pas = cleanNumber(getColValue(row, ['Saldo_Anterior', 'Saldo Anterior', 'saldo_pasado', 'SALDO_ANTERIOR']));
                 const s_act = cleanNumber(getColValue(row, ['Saldo_Actual', 'Saldo Actual', 'saldo_actual', 'SALDO_ACTUAL']));
                 
@@ -114,7 +113,7 @@ $(document).ready(function () {
             $('#loader-overlay').hide(); 
         },
         error: function(err) {
-            $('#loader-text').text("Error leyendo el CSV. Asegúrate de que el nombre del archivo coincida.");
+            $('#loader-text').text("Error leyendo el CSV.");
             $('#loader-text').css("color", "red");
         }
     });
@@ -137,53 +136,90 @@ function getFiltros() {
 
 function filtrarYActualizar() {
     actualizando = true; const f = getFiltros();
-    let filtered = globalData.filter(d => {
+    
+    // Función 1: Filtro de Producto (Afecta a TODOS)
+    const matchProducto = (d) => {
         if (f.emp.length && !f.emp.includes(d.emp)) return false;
-        if (f.catT.length && !f.catT.includes(d.catT)) return false;
-        if (f.tipo.length && !f.tipo.includes(d.tipoFiltro)) return false;
-        if (f.tda.length && !f.tda.includes(d.tda)) return false;
         if (f.div.length && !f.div.includes(d.div)) return false;
         if (f.cat.length && !f.cat.includes(d.cat)) return false;
         if (f.grp.length && !f.grp.includes(d.grp)) return false;
         return true;
-    });
-    actualizarKPIs(filtered); actualizarGraficos(filtered); actualizarTablas(filtered); actualizando = false;
+    };
+
+    // Función 2: Filtro de Tienda (Afecta SOLO a las Tiendas, no al CEDIS)
+    const matchTienda = (d) => {
+        if (f.catT.length && !f.catT.includes(d.catT)) return false;
+        if (f.tipo.length && !f.tipo.includes(d.tipoFiltro)) return false;
+        if (f.tda.length && !f.tda.includes(d.tda)) return false;
+        return true;
+    };
+
+    // Separamos la base de datos para no afectar el CEDIS con los filtros locales
+    let filteredVentas = globalData.filter(d => matchProducto(d) && matchTienda(d));
+    let filteredCedis = globalData.filter(d => d.is_cedis && matchProducto(d));
+
+    actualizarKPIs(filteredVentas, filteredCedis); 
+    actualizarGraficos(filteredVentas); 
+    actualizarTablas(filteredVentas, filteredCedis); 
+    actualizando = false;
 }
 
-function actualizarKPIs(data) {
-    let v_pas = 0, v_act = 0, dif = 0, s_tda_act = 0, s_cedis_act = 0;
-    data.forEach(d => { 
+function actualizarKPIs(ventasData, cedisData) {
+    let v_pas = 0, v_act = 0, dif = 0, s_tda_act = 0;
+    
+    ventasData.forEach(d => { 
         v_pas += d.v_pas; v_act += d.v_act; dif += d.dif; 
-        if (d.is_cedis) s_cedis_act += d.s_act; else s_tda_act += d.s_act; 
+        if (!d.is_cedis) s_tda_act += d.s_act; 
     });
-    $('#kpiVtaPas').text(formatNum(v_pas)); $('#kpiVtaAct').text(formatNum(v_act)); $('#kpiDifVta').text(formatNum(dif));
-    $('#kpiSaldTienda').text(formatNum(s_tda_act)); $('#kpiSaldCedis').text(formatNum(s_cedis_act)); $('#kpiSaldTotal').text(formatNum(s_tda_act + s_cedis_act));
+    
+    let s_cedis_act = 0;
+    cedisData.forEach(d => { s_cedis_act += d.s_act; });
+
+    $('#kpiVtaPas').text(formatNum(v_pas)); 
+    $('#kpiVtaAct').text(formatNum(v_act)); 
+    $('#kpiDifVta').text(formatNum(dif));
+    $('#kpiSaldTienda').text(formatNum(s_tda_act)); 
+    $('#kpiSaldCedis').text(formatNum(s_cedis_act)); 
+    $('#kpiSaldTotal').text(formatNum(s_tda_act + s_cedis_act));
 }
 
-function actualizarTablas(data) {
+function actualizarTablas(ventasData, cedisData) {
     let resG = {}, resT = {};
     let cedisStockByGrupo = {};
 
-    // 1er paso: Rescatar el inventario de las bodegas/almacenes/cedis
-    data.forEach(d => {
-        if (d.is_cedis) {
-            const kBodega = d.emp + '|' + d.grp; // Agrupado por empresa y grupo
-            if (!cedisStockByGrupo[kBodega]) cedisStockByGrupo[kBodega] = { pas: 0, act: 0 };
-            cedisStockByGrupo[kBodega].pas += d.s_pas;
-            cedisStockByGrupo[kBodega].act += d.s_act;
-        }
+    // Mapeo general del inventario en CEDIS
+    cedisData.forEach(d => {
+        const kBodega = d.emp + '|' + d.grp; 
+        if (!cedisStockByGrupo[kBodega]) cedisStockByGrupo[kBodega] = { pas: 0, act: 0 };
+        cedisStockByGrupo[kBodega].pas += d.s_pas;
+        cedisStockByGrupo[kBodega].act += d.s_act;
     });
 
+    let grupoCedisCheck = {};
     let tiendaGruposCheck = {}; 
 
-    // 2do paso: Llenar las tablas asignando los saldos correctamente
-    data.forEach(d => {
+    // Llenado de tablas basado en lo que el usuario filtró
+    ventasData.forEach(d => {
         // --- TABLA POR GRUPO ---
         const kG = d.div + '|' + d.cat + '|' + d.grp;
-        if(!resG[kG]) resG[kG] = {div: d.div, cat: d.cat, grp: d.grp, vp:0, va:0, dif:0, s_tda_pas:0, s_tda_act:0, s_ced_pas:0, s_ced_act:0};
+        if(!resG[kG]) {
+            resG[kG] = {div: d.div, cat: d.cat, grp: d.grp, vp:0, va:0, dif:0, s_tda_pas:0, s_tda_act:0, s_ced_pas:0, s_ced_act:0};
+            grupoCedisCheck[kG] = new Set();
+        }
         resG[kG].vp += d.v_pas; resG[kG].va += d.v_act; resG[kG].dif += d.dif;
-        if(d.is_cedis) { resG[kG].s_ced_pas += d.s_pas; resG[kG].s_ced_act += d.s_act; } 
-        else { resG[kG].s_tda_pas += d.s_pas; resG[kG].s_tda_act += d.s_act; }
+        
+        if (!d.is_cedis) {
+            resG[kG].s_tda_pas += d.s_pas; resG[kG].s_tda_act += d.s_act;
+        }
+
+        const kBodega = d.emp + '|' + d.grp;
+        if (!grupoCedisCheck[kG].has(kBodega)) {
+            grupoCedisCheck[kG].add(kBodega);
+            if (cedisStockByGrupo[kBodega]) {
+                resG[kG].s_ced_pas += cedisStockByGrupo[kBodega].pas;
+                resG[kG].s_ced_act += cedisStockByGrupo[kBodega].act;
+            }
+        }
 
         // --- TABLA POR TIENDA ---
         const kT = d.catT + '|' + d.tipoFiltro + '|' + d.tda;
@@ -194,14 +230,10 @@ function actualizarTablas(data) {
         resT[kT].vp += d.v_pas; resT[kT].va += d.v_act; resT[kT].dif += d.dif;
         
         if (d.is_cedis) {
-            // Si la línea ES el CEDIS/Megabodega, su saldo va a las columnas de CEDIS. Tienda queda en 0.
             resT[kT].s_ced_pas += d.s_pas; resT[kT].s_ced_act += d.s_act;
         } else {
-            // Si la línea es una Tienda normal, su saldo va a la columna de Tienda
             resT[kT].s_tda_pas += d.s_pas; resT[kT].s_tda_act += d.s_act;
             
-            // Le adjuntamos el saldo de su CEDIS respectivo para los grupos que vende
-            const kBodega = d.emp + '|' + d.grp;
             if (!tiendaGruposCheck[kT].has(kBodega)) {
                 tiendaGruposCheck[kT].add(kBodega);
                 if (cedisStockByGrupo[kBodega]) {
@@ -228,9 +260,9 @@ function actualizarTablas(data) {
     tablaT.clear(); tablaT.rows.add(arrT); tablaT.draw(false);
 }
 
-function actualizarGraficos(data) {
+function actualizarGraficos(ventasData) {
     let catMap = {}, divMap = {};
-    data.forEach(d => { catMap[d.cat] = (catMap[d.cat] || 0) + d.v_act; divMap[d.div] = (divMap[d.div] || 0) + d.v_act; });
+    ventasData.forEach(d => { catMap[d.cat] = (catMap[d.cat] || 0) + d.v_act; divMap[d.div] = (divMap[d.div] || 0) + d.v_act; });
     const topCat = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
     const topDiv = Object.entries(divMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
 
