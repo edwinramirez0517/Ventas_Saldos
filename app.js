@@ -36,7 +36,7 @@ function determineEmpresa(name) {
 }
 
 function cleanNumber(val) {
-    if (val === null || val === undefined) return 0;
+    if (val === null || val === undefined || val === '') return 0;
     let cleanedString = String(val).replace(/,/g, '').replace(/\s/g, '').replace('$', '');
     let parsed = parseFloat(cleanedString);
     return isNaN(parsed) ? 0 : parsed;
@@ -73,42 +73,37 @@ $(document).ready(function () {
                 const catT = getColValue(row, ['Categoria_Tienda', 'categoria_tienda', 'Cat_Tienda', 'Categoria Tienda']) || 'N/A';
                 
                 // =========================================================
-                // CORRECCIÓN CRÍTICA DE LÓGICA (Separar Bodega de Filtro)
+                // LÓGICA DE CLASIFICACIÓN
                 // =========================================================
                 
                 // A) ¿Actúa como un CEDIS/Almacén para los cálculos de inventario?
                 const isCedisInterno = upperName.includes('CD ') || upperName.includes('CEDIS') || upperName.includes('MEGABODEGA') || String(catT).toUpperCase() === 'ALMACEN';
                 
-                // B) ¿Bajo qué nombre debe salir en el Filtro Desplegable del usuario? (Solo Mayoreo/Detalle)
+                // B) ¿Bajo qué nombre debe salir en el Filtro Desplegable? (Solo Mayoreo/Detalle)
                 let tipoFilter = 'DETALLE';
-                if (upperName.includes('MAYOREO') || upperName.includes('MEGABODEGA') || upperName.includes('AEC') || upperName.includes('DS') || isCedisInterno) {
+                if (upperName.includes('MAYOREO') || upperName.includes('MEGABODEGA') || isCedisInterno) {
                     tipoFilter = 'MAYOREO';
                 }
                 
                 const div = getColValue(row, ['Division', 'division', 'DIVISION']) || 'N/A';
                 const cat = getColValue(row, ['Categoria', 'categoria', 'CATEGORIA']) || 'N/A';
                 
-                // C) Lectura invertida de saldos
-                let s_act = 0, s_ant = 0;
-                if (row['saldo_actual'] !== undefined || row['saldo_pasado'] !== undefined) {
-                    s_act = cleanNumber(row['saldo_actual']); s_ant = cleanNumber(row['saldo_pasado']);
-                } else {
-                    s_act = cleanNumber(getColValue(row, ['Saldo_Anterior', 'Saldo Anterior']));
-                    s_ant = cleanNumber(getColValue(row, ['Saldo_Actual', 'Saldo Actual']));
-                }
-
+                // C) Lectura lineal directa sin inversión
+                const s_pas = cleanNumber(getColValue(row, ['Saldo_Anterior', 'Saldo Anterior', 'saldo_pasado', 'SALDO_ANTERIOR']));
+                const s_act = cleanNumber(getColValue(row, ['Saldo_Actual', 'Saldo Actual', 'saldo_actual', 'SALDO_ACTUAL']));
+                
+                const v_pas = cleanNumber(getColValue(row, ['Venta_Und_Anterior', 'venta_pasada', 'Venta Anterior', 'VENTA_ANTERIOR']));
                 const v_act = cleanNumber(getColValue(row, ['Venta_Und_Actual', 'venta_actual', 'Venta Actual', 'VENTA_ACTUAL']));
-                const v_ant = cleanNumber(getColValue(row, ['Venta_Und_Anterior', 'venta_pasada', 'Venta Anterior', 'VENTA_ANTERIOR']));
                 const dif = cleanNumber(getColValue(row, ['Diferencia_Und', 'diferencia', 'Diferencia Und', 'DIFERENCIA']));
 
                 lookups.empresa.add(empresa); lookups.cat_tienda.add(catT); 
-                lookups.tipo_tienda.add(tipoFilter); // El dropdown será limpio
+                lookups.tipo_tienda.add(tipoFilter); 
                 lookups.tienda.add(tdaName); lookups.division.add(div); lookups.categoria.add(cat); lookups.grupo.add(grpName);
 
                 globalData.push({
                     emp: empresa, catT: catT, tipoFiltro: tipoFilter, 
                     tda: tdaName, div: div, cat: cat, grp: grpName,
-                    s_ant: s_ant, s_act: s_act, v_ant: v_ant, v_act: v_act, dif: dif, is_cedis: isCedisInterno
+                    s_pas: s_pas, s_act: s_act, v_pas: v_pas, v_act: v_act, dif: dif, is_cedis: isCedisInterno
                 });
             });
         },
@@ -156,13 +151,13 @@ function filtrarYActualizar() {
 }
 
 function actualizarKPIs(data) {
-    let v_ant = 0, v_act = 0, dif = 0, s_tda = 0, s_cedis = 0;
+    let v_pas = 0, v_act = 0, dif = 0, s_tda_act = 0, s_cedis_act = 0;
     data.forEach(d => { 
-        v_ant += d.v_ant; v_act += d.v_act; dif += d.dif; 
-        if (d.is_cedis) s_cedis += d.s_act; else s_tda += d.s_act; 
+        v_pas += d.v_pas; v_act += d.v_act; dif += d.dif; 
+        if (d.is_cedis) s_cedis_act += d.s_act; else s_tda_act += d.s_act; 
     });
-    $('#kpiVtaPas').text(formatNum(v_ant)); $('#kpiVtaAct').text(formatNum(v_act)); $('#kpiDifVta').text(formatNum(dif));
-    $('#kpiSaldTienda').text(formatNum(s_tda)); $('#kpiSaldCedis').text(formatNum(s_cedis)); $('#kpiSaldTotal').text(formatNum(s_tda + s_cedis));
+    $('#kpiVtaPas').text(formatNum(v_pas)); $('#kpiVtaAct').text(formatNum(v_act)); $('#kpiDifVta').text(formatNum(dif));
+    $('#kpiSaldTienda').text(formatNum(s_tda_act)); $('#kpiSaldCedis').text(formatNum(s_cedis_act)); $('#kpiSaldTotal').text(formatNum(s_tda_act + s_cedis_act));
 }
 
 function actualizarTablas(data) {
@@ -174,7 +169,7 @@ function actualizarTablas(data) {
         if (d.is_cedis) {
             const kBodega = d.emp + '|' + d.grp; // Agrupado por empresa y grupo
             if (!cedisStockByGrupo[kBodega]) cedisStockByGrupo[kBodega] = { pas: 0, act: 0 };
-            cedisStockByGrupo[kBodega].pas += d.s_ant;
+            cedisStockByGrupo[kBodega].pas += d.s_pas;
             cedisStockByGrupo[kBodega].act += d.s_act;
         }
     });
@@ -185,25 +180,25 @@ function actualizarTablas(data) {
     data.forEach(d => {
         // --- TABLA POR GRUPO ---
         const kG = d.div + '|' + d.cat + '|' + d.grp;
-        if(!resG[kG]) resG[kG] = {div: d.div, cat: d.cat, grp: d.grp, va:0, vc:0, dif:0, s_tda_pas:0, s_tda_act:0, s_ced_pas:0, s_ced_act:0};
-        resG[kG].va += d.v_ant; resG[kG].vc += d.v_act; resG[kG].dif += d.dif;
-        if(d.is_cedis) { resG[kG].s_ced_pas += d.s_ant; resG[kG].s_ced_act += d.s_act; } 
-        else { resG[kG].s_tda_pas += d.s_ant; resG[kG].s_tda_act += d.s_act; }
+        if(!resG[kG]) resG[kG] = {div: d.div, cat: d.cat, grp: d.grp, vp:0, va:0, dif:0, s_tda_pas:0, s_tda_act:0, s_ced_pas:0, s_ced_act:0};
+        resG[kG].vp += d.v_pas; resG[kG].va += d.v_act; resG[kG].dif += d.dif;
+        if(d.is_cedis) { resG[kG].s_ced_pas += d.s_pas; resG[kG].s_ced_act += d.s_act; } 
+        else { resG[kG].s_tda_pas += d.s_pas; resG[kG].s_tda_act += d.s_act; }
 
         // --- TABLA POR TIENDA ---
         const kT = d.catT + '|' + d.tipoFiltro + '|' + d.tda;
         if(!resT[kT]) {
-            resT[kT] = {emp: d.emp, catT: d.catT, tipo: d.tipoFiltro, tda: d.tda, isCedisRow: d.is_cedis, va:0, vc:0, dif:0, s_tda_pas:0, s_tda_act:0, s_ced_pas:0, s_ced_act:0};
+            resT[kT] = {catT: d.catT, tipo: d.tipoFiltro, tda: d.tda, isCedisRow: d.is_cedis, vp:0, va:0, dif:0, s_tda_pas:0, s_tda_act:0, s_ced_pas:0, s_ced_act:0};
             tiendaGruposCheck[kT] = new Set();
         }
-        resT[kT].va += d.v_ant; resT[kT].vc += d.v_act; resT[kT].dif += d.dif;
+        resT[kT].vp += d.v_pas; resT[kT].va += d.v_act; resT[kT].dif += d.dif;
         
         if (d.is_cedis) {
             // Si la línea ES el CEDIS/Megabodega, su saldo va a las columnas de CEDIS. Tienda queda en 0.
-            resT[kT].s_ced_pas += d.s_ant; resT[kT].s_ced_act += d.s_act;
+            resT[kT].s_ced_pas += d.s_pas; resT[kT].s_ced_act += d.s_act;
         } else {
             // Si la línea es una Tienda normal, su saldo va a la columna de Tienda
-            resT[kT].s_tda_pas += d.s_ant; resT[kT].s_tda_act += d.s_act;
+            resT[kT].s_tda_pas += d.s_pas; resT[kT].s_tda_act += d.s_act;
             
             // Le adjuntamos el saldo de su CEDIS respectivo para los grupos que vende
             const kBodega = d.emp + '|' + d.grp;
@@ -218,13 +213,13 @@ function actualizarTablas(data) {
     });
 
     const arrG = Object.values(resG).map(i => [
-        i.div, i.cat, i.grp, formatNum(i.va), formatNum(i.vc), formatBadge(i.dif),
+        i.div, i.cat, i.grp, formatNum(i.vp), formatNum(i.va), formatBadge(i.dif),
         formatNum(i.s_tda_pas), formatNum(i.s_tda_act), formatNum(i.s_ced_pas), formatNum(i.s_ced_act), 
         formatNum(i.s_tda_pas + i.s_ced_pas), formatNum(i.s_tda_act + i.s_ced_act)
     ]);
 
     const arrT = Object.values(resT).map(i => [
-        i.catT, i.tipo, i.tda, formatNum(i.va), formatNum(i.vc), formatBadge(i.dif),
+        i.catT, i.tipo, i.tda, formatNum(i.vp), formatNum(i.va), formatBadge(i.dif),
         formatNum(i.s_tda_pas), formatNum(i.s_tda_act), formatNum(i.s_ced_pas), formatNum(i.s_ced_act),
         formatNum(i.s_tda_pas + i.s_ced_pas), formatNum(i.s_tda_act + i.s_ced_act)
     ]);
