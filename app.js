@@ -1,5 +1,5 @@
 // ==========================================
-// app.js - Lógica Dinámica y Filtros Inteligentes (Versión Ejecutiva)
+// app.js - Lógica Dinámica y Gráficos Limpios
 // ==========================================
 
 let globalData = [];
@@ -15,14 +15,12 @@ function formatNum(num) {
     return Number(num).toLocaleString('en-US', { maximumFractionDigits: 0 }); 
 }
 
-// Formato de badge para la tabla (más relleno)
 function formatBadge(num) {
     if (num > 0) return `<span style="color: #0f5132; font-weight: 800; background-color: #d1e7dd; padding: 4px 10px; border-radius: 6px;">+${formatNum(num)}</span>`;
     if (num < 0) return `<span style="color: #842029; font-weight: 800; background-color: #f8d7da; padding: 4px 10px; border-radius: 6px;">${formatNum(num)}</span>`;
     return `<span style="color: #495057; font-weight: bold; background-color: #e9ecef; padding: 4px 10px; border-radius: 6px;">0</span>`;
 }
 
-// Formato de mini-badge para las tarjetas (más elegante y ejecutivo)
 function formatSubBadge(num) {
     let style = "font-weight: 800; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;";
     if (num > 0) return `<span style="${style} color: #0f5132; background-color: #d1e7dd;">+${formatNum(num)}</span>`;
@@ -64,20 +62,8 @@ $(document).ready(function () {
         pageLength: 20, 
         deferRender: true,
         columnDefs: [
-            {
-                targets: [3, 4, 6, 7, 8, 9, 10, 11],
-                render: function (data, type) {
-                    if (type === 'display') return formatNum(data);
-                    return data; 
-                }
-            },
-            {
-                targets: [5], 
-                render: function (data, type) {
-                    if (type === 'display') return formatBadge(data);
-                    return data; 
-                }
-            },
+            { targets: [3, 4, 6, 7, 8, 9, 10, 11], render: function (data, type) { if (type === 'display') return formatNum(data); return data; } },
+            { targets: [5], render: function (data, type) { if (type === 'display') return formatBadge(data); return data; } },
             { targets: [6, 7], className: 'col-tienda text-center align-middle' },
             { targets: [8, 9], className: 'col-cedis text-center align-middle' },
             { targets: [10, 11], className: 'col-total text-center align-middle' },
@@ -191,34 +177,23 @@ function filtrarYActualizar() {
 }
 
 function actualizarKPIs(ventasData, cedisData) {
-    let v_pas = 0, v_act = 0, dif = 0;
-    let s_tda_pas = 0, s_tda_act = 0;
+    let v_pas = 0, v_act = 0, dif = 0, s_tda_pas = 0, s_tda_act = 0;
     
     ventasData.forEach(d => { 
         v_pas += d.v_pas; v_act += d.v_act; dif += d.dif; 
-        if (!d.is_cedis) {
-            s_tda_pas += d.s_pas;
-            s_tda_act += d.s_act; 
-        }
+        if (!d.is_cedis) { s_tda_pas += d.s_pas; s_tda_act += d.s_act; }
     });
     
     let s_cedis_pas = 0, s_cedis_act = 0;
-    cedisData.forEach(d => { 
-        s_cedis_pas += d.s_pas;
-        s_cedis_act += d.s_act; 
-    });
+    cedisData.forEach(d => { s_cedis_pas += d.s_pas; s_cedis_act += d.s_act; });
 
     $('#kpiVtaPas').text(formatNum(v_pas)); 
     $('#kpiVtaAct').text(formatNum(v_act)); 
     $('#kpiDifVta').text(formatNum(dif));
-    
     $('#kpiSaldTienda').text(formatNum(s_tda_act)); 
     $('#kpiSaldCedis').text(formatNum(s_cedis_act)); 
     $('#kpiSaldTotal').text(formatNum(s_tda_act + s_cedis_act));
 
-    // ==========================================
-    // INYECCIÓN DE LA ETIQUETA DE DIFERENCIA EN SALDOS
-    // ==========================================
     let dif_tda = s_tda_act - s_tda_pas;
     let dif_cedis = s_cedis_act - s_cedis_pas;
     let dif_total = (s_tda_act + s_cedis_act) - (s_tda_pas + s_cedis_pas);
@@ -251,9 +226,7 @@ function actualizarTablas(ventasData, cedisData) {
         }
         resG[kG].vp += d.v_pas; resG[kG].va += d.v_act; resG[kG].dif += d.dif;
         
-        if (!d.is_cedis) {
-            resG[kG].s_tda_pas += d.s_pas; resG[kG].s_tda_act += d.s_act;
-        }
+        if (!d.is_cedis) { resG[kG].s_tda_pas += d.s_pas; resG[kG].s_tda_act += d.s_act; }
 
         const kBodega = d.emp + '|' + d.grp;
         if (!grupoCedisCheck[kG].has(kBodega)) {
@@ -275,7 +248,6 @@ function actualizarTablas(ventasData, cedisData) {
             resT[kT].s_ced_pas += d.s_pas; resT[kT].s_ced_act += d.s_act;
         } else {
             resT[kT].s_tda_pas += d.s_pas; resT[kT].s_tda_act += d.s_act;
-            
             if (!tiendaGruposCheck[kT].has(kBodega)) {
                 tiendaGruposCheck[kT].add(kBodega);
                 if (cedisStockByGrupo[kBodega]) {
@@ -308,9 +280,36 @@ function actualizarGraficos(ventasData) {
     const topCat = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
     const topDiv = Object.entries(divMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
 
+    // CONFIGURACIÓN VISUAL LIMPIA (Sin cuadrícula, sin números en Eje Y)
+    const cleanOptions = {
+        maintainAspectRatio: false,
+        scales: {
+            x: { grid: { display: false }, border: { display: false } },
+            y: { display: false } // Oculta el eje Y por completo
+        },
+        plugins: {
+            datalabels: { color: '#000', anchor: 'end', align: 'top', font: {weight: 'bold'}, formatter: v=>formatNum(v) },
+            legend: { display: false }
+        }
+    };
+
     if(chart1) chart1.destroy();
-    chart1 = new Chart($('#chartCategorias'), { type: 'bar', data: { labels: topCat.map(x=>x[0].substring(0,15)), datasets: [{ label: 'Venta Actual', data: topCat.map(x=>x[1]), backgroundColor: '#012094' }] }, options: { maintainAspectRatio: false, plugins: { datalabels: { color: '#000', anchor: 'end', align: 'top', formatter: v=>formatNum(v) }, legend: {display: false}, title: {display:true, text:'Top 10 Categorías'} } } });
+    chart1 = new Chart($('#chartCategorias'), { 
+        type: 'bar', 
+        data: { 
+            labels: topCat.map(x=>x[0].substring(0,15)), 
+            datasets: [{ label: 'Venta Actual', data: topCat.map(x=>x[1]), backgroundColor: '#012094', borderRadius: 4 }] 
+        }, 
+        options: { ...cleanOptions, plugins: { ...cleanOptions.plugins, title: {display:true, text:'Top 10 Categorías', font: {size: 14}} } } 
+    });
 
     if(chart2) chart2.destroy();
-    chart2 = new Chart($('#chartDivisiones'), { type: 'bar', data: { labels: topDiv.map(x=>x[0].substring(0,15)), datasets: [{ label: 'Venta Actual', data: topDiv.map(x=>x[1]), backgroundColor: '#E1251B' }] }, options: { maintainAspectRatio: false, plugins: { datalabels: { color: '#000', anchor: 'end', align: 'top', formatter: v=>formatNum(v) }, legend: {display: false}, title: {display:true, text:'Top 10 Divisiones'} } } });
+    chart2 = new Chart($('#chartDivisiones'), { 
+        type: 'bar', 
+        data: { 
+            labels: topDiv.map(x=>x[0].substring(0,15)), 
+            datasets: [{ label: 'Venta Actual', data: topDiv.map(x=>x[1]), backgroundColor: '#E1251B', borderRadius: 4 }] 
+        }, 
+        options: { ...cleanOptions, plugins: { ...cleanOptions.plugins, title: {display:true, text:'Top 10 Divisiones', font: {size: 14}} } } 
+    });
 }
