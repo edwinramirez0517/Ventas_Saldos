@@ -1,5 +1,5 @@
 // ==========================================
-// app.js - Lógica Dinámica y Filtros Inteligentes
+// app.js - Lógica Dinámica y Filtros Inteligentes (Versión Visual Final)
 // ==========================================
 
 let globalData = [];
@@ -15,10 +15,11 @@ function formatNum(num) {
     return Number(num).toLocaleString('en-US', { maximumFractionDigits: 0 }); 
 }
 
+// Estilo visual mejorado para positivos y negativos
 function formatBadge(num) {
-    if (num > 0) return `<span class="badge-positivo" style="color: #0f5132; font-weight: bold; background-color: #d1e7dd; padding: 3px 8px; border-radius: 4px;">${formatNum(num)}</span>`;
-    if (num < 0) return `<span class="badge-negativo" style="color: #842029; font-weight: bold; background-color: #f8d7da; padding: 3px 8px; border-radius: 4px;">${formatNum(num)}</span>`;
-    return `<span class="badge-neutro" style="color: #495057; font-weight: bold; background-color: #e9ecef; padding: 3px 8px; border-radius: 4px;">0</span>`;
+    if (num > 0) return `<span style="color: #0f5132; font-weight: 800; background-color: #d1e7dd; padding: 4px 10px; border-radius: 6px;">+${formatNum(num)}</span>`;
+    if (num < 0) return `<span style="color: #842029; font-weight: 800; background-color: #f8d7da; padding: 4px 10px; border-radius: 6px;">${formatNum(num)}</span>`;
+    return `<span style="color: #495057; font-weight: bold; background-color: #e9ecef; padding: 4px 10px; border-radius: 6px;">0</span>`;
 }
 
 function formatState(state) {
@@ -28,7 +29,6 @@ function formatState(state) {
     return $('<span></span>').append($cb).append(' ' + state.text);
 }
 
-// 1. REGLA EMPRESA
 function determineEmpresa(name) {
     name = String(name).toUpperCase();
     if (name.includes('DS') || name.includes('VITRINA')) return 'DANILOS STORE';
@@ -52,7 +52,7 @@ $(document).ready(function () {
     $('.form-select').select2({ theme: 'bootstrap-5', placeholder: 'Todas...', allowClear: true, closeOnSelect: false, templateResult: formatState });
 
     // ==========================================
-    // CONFIGURACIÓN DATATABLES (CORRECCIÓN DE ORDENAMIENTO)
+    // ESTILOS VISUALES PARA LAS COLUMNAS DE LA TABLA
     // ==========================================
     const conf = { 
         language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json' }, 
@@ -60,19 +60,24 @@ $(document).ready(function () {
         deferRender: true,
         columnDefs: [
             {
-                targets: [3, 4, 6, 7, 8, 9, 10, 11], // Todas las columnas numéricas
+                targets: [3, 4, 6, 7, 8, 9, 10, 11], // Columnas numéricas
                 render: function (data, type) {
                     if (type === 'display') return formatNum(data);
-                    return data; // Usa el número crudo para ordenar
+                    return data; 
                 }
             },
             {
-                targets: [5], // Columna de Diferencia (la de los colores)
+                targets: [5], // Diferencia
                 render: function (data, type) {
                     if (type === 'display') return formatBadge(data);
-                    return data; // Usa el número crudo para ordenar
+                    return data; 
                 }
-            }
+            },
+            // Aplicar colores de fondo a todo el cuerpo de las columnas
+            { targets: [6, 7], className: 'col-tienda text-center align-middle' },
+            { targets: [8, 9], className: 'col-cedis text-center align-middle' },
+            { targets: [10, 11], className: 'col-total text-center align-middle' },
+            { targets: '_all', className: 'text-center align-middle' } // Centrar lo demás
         ]
     };
     
@@ -94,7 +99,6 @@ $(document).ready(function () {
                 
                 const upperName = String(tdaName).toUpperCase();
                 
-                // Exclusión de tienda fantasma
                 if (upperName.includes('MEGATIENDA#2-AEC-DS')) return; 
 
                 const empresa = determineEmpresa(upperName);
@@ -217,7 +221,6 @@ function actualizarTablas(ventasData, cedisData) {
     let tiendaGruposCheck = {}; 
 
     ventasData.forEach(d => {
-        // --- TABLA POR GRUPO ---
         const kG = d.div + '|' + d.cat + '|' + d.grp;
         if(!resG[kG]) {
             resG[kG] = {div: d.div, cat: d.cat, grp: d.grp, vp:0, va:0, dif:0, s_tda_pas:0, s_tda_act:0, s_ced_pas:0, s_ced_act:0};
@@ -238,7 +241,6 @@ function actualizarTablas(ventasData, cedisData) {
             }
         }
 
-        // --- TABLA POR TIENDA ---
         const kT = d.catT + '|' + d.tipoFiltro + '|' + d.tda;
         if(!resT[kT]) {
             resT[kT] = {catT: d.catT, tipo: d.tipoFiltro, tda: d.tda, isCedisRow: d.is_cedis, vp:0, va:0, dif:0, s_tda_pas:0, s_tda_act:0, s_ced_pas:0, s_ced_act:0};
@@ -261,9 +263,6 @@ function actualizarTablas(ventasData, cedisData) {
         }
     });
 
-    // ==========================================
-    // AQUÍ PASAMOS EL NÚMERO CRUDO A LA TABLA, NO EL TEXTO FORMATEADO
-    // ==========================================
     const arrG = Object.values(resG).map(i => [
         i.div, i.cat, i.grp, 
         i.vp, i.va, i.dif,
