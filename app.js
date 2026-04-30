@@ -1,5 +1,5 @@
 // ==========================================
-// app.js - Lógica de Inyección y Procesamiento Corregida
+// app.js - Lógica de Inyección y Procesamiento (Corregido)
 // ==========================================
 
 let globalData = [];
@@ -29,19 +29,20 @@ function determineEmpresa(name) {
     return 'EL COMPADRE';
 }
 
-// 2. Clasificación estricta de tipo de tienda (Corregido para evitar falsos CEDIS)
+// 2. Clasificación estricta de tipo de tienda
 function determineTipoTienda(name) {
     name = String(name).toUpperCase();
-    // CEDIS estricto
     if (name.includes('CD ') || name.includes('CEDIS')) return 'CEDIS';
-    // Mayoreo (incluyendo megabodegas que antes se confundían con CEDIS)
     if (name.includes('AEC') || name.includes('DS') || name.includes('MAYOREO') || name.includes('MEGABODEGA')) return 'MAYOREO';
     return 'DETALLE';
 }
 
-// Función auxiliar para forzar números limpios (Evita perder ventas por celdas vacías)
+// 3. Limpieza profunda de los números del CSV (Esta es la solución a la pérdida de datos)
 function cleanNumber(val) {
-    let parsed = parseFloat(val);
+    if (val === null || val === undefined) return 0;
+    // Convierte el valor a texto, le quita todas las comas, espacios y símbolos de moneda, y luego lo pasa a decimal.
+    let cleanedString = String(val).replace(/,/g, '').replace(/\s/g, '').replace('$', '');
+    let parsed = parseFloat(cleanedString);
     return isNaN(parsed) ? 0 : parsed;
 }
 
@@ -61,7 +62,7 @@ $(document).ready(function () {
         header: true,
         delimiter: ";", 
         skipEmptyLines: true,
-        dynamicTyping: true,
+        dynamicTyping: false, // Desactivado para recibir siempre texto y poder limpiarlo con cleanNumber
         chunk: function(results) {
             results.data.forEach(row => {
                 if (!row.Name || !row.Grupo) return; 
@@ -70,10 +71,11 @@ $(document).ready(function () {
                 const tipo = determineTipoTienda(row.Name);
                 const catT = row.Categoria_Tienda || 'N/A';
                 
-                // 3. Limpieza absoluta de números y cruce de saldos
-                // Se invierten los saldos según tu regla de negocio
+                // Limpieza de números (Removiendo comas y evitando errores de cálculo)
+                // Se invierten los saldos: El anterior pasa a actual.
                 const s_ant = cleanNumber(row.Saldo_Actual); 
                 const s_act = cleanNumber(row.Saldo_Anterior); 
+                
                 const v_ant = cleanNumber(row.Venta_Und_Anterior);
                 const v_act = cleanNumber(row.Venta_Und_Actual);
                 const dif = cleanNumber(row.Diferencia_Und);
@@ -94,7 +96,7 @@ $(document).ready(function () {
             $('#loader-overlay').hide(); 
         },
         error: function(err) {
-            $('#loader-text').text("Error leyendo el CSV. Verifica el nombre.");
+            $('#loader-text').text("Error leyendo el CSV. Verifica que el archivo reporte_ventas_unidades_2025_2026.csv exista.");
             $('#loader-text').css("color", "red");
         }
     });
@@ -137,13 +139,13 @@ function actualizarKPIs(data) {
         v_act += d.v_act; 
         dif += d.dif; 
         
-        // Sumar saldos actuales invertidos
         if (d.is_cedis) {
             s_cedis += d.s_act; 
         } else {
             s_tda += d.s_act; 
         }
     });
+    
     $('#kpiVtaPas').text(formatNum(v_ant)); 
     $('#kpiVtaAct').text(formatNum(v_act)); 
     $('#kpiDifVta').text(formatNum(dif));
