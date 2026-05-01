@@ -44,9 +44,10 @@
         .kpi-value { font-size: 1.5rem; font-weight: 900; color: #212529; }
 
         /* TABLAS: EFECTOS HOVER Y COLUMNAS RESALTADAS */
-        .table-responsive { max-height: 550px; overflow-y: auto; border-radius: 8px; border: 1px solid #dee2e6; }
-        table.dataTable thead th { position: sticky !important; top: 0 !important; z-index: 1000 !important; background-color: var(--brand-blue) !important; color: white !important; text-align: center !important; }
-        table.dataTable tbody td { text-align: center !important; vertical-align: middle !important; transition: background-color 0.2s ease; }
+        .table-responsive { max-height: 550px; overflow-y: auto; border-radius: 8px; border: 2px solid var(--brand-blue); }
+        table.dataTable { border-collapse: collapse !important; width: 100%; }
+        table.dataTable thead th { position: sticky !important; top: 0 !important; z-index: 1000 !important; background-color: var(--brand-blue) !important; color: white !important; text-align: center !important; border-bottom: 3px solid var(--brand-red) !important; border-right: 1px solid rgba(255, 255, 255, 0.2) !important; border-top: none !important; border-left: none !important; }
+        table.dataTable tbody td { text-align: center !important; vertical-align: middle !important; transition: background-color 0.2s ease; border-bottom: 1px solid rgba(1, 32, 148, 0.2) !important; border-right: 1px solid rgba(1, 32, 148, 0.1) !important; border-top: none !important; border-left: none !important; }
         
         /* Iluminar toda la fila al pasar el mouse */
         table.dataTable tbody tr:hover td { background-color: rgba(1, 32, 148, 0.12) !important; color: var(--brand-blue); font-weight: bold; cursor: pointer; }
