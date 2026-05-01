@@ -58,6 +58,7 @@ $(document).ready(function () {
     $('.form-select').select2({ theme: 'bootstrap-5', placeholder: 'Todas...', allowClear: true, closeOnSelect: false, templateResult: formatState });
 
     const conf = { 
+        dom: 'lrtip',
         language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json' }, 
         pageLength: 20, 
         deferRender: true,
@@ -135,6 +136,12 @@ $(document).ready(function () {
 
     $('#btnLimpiar').click(() => { $('.form-select').val(null).trigger('change'); filtrarYActualizar(); });
     $('.form-select').on('change', function () { if (!actualizando) filtrarYActualizar(); });
+
+    $('#buscadorGlobal').on('keyup', function () {
+        const val = $(this).val();
+        tablaG.search(val).draw();
+        tablaT.search(val).draw();
+    });
 });
 
 function populateSelects() {
