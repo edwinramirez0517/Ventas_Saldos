@@ -75,7 +75,6 @@ function cargarDatosPorMes(nombreArchivo) {
         delimiter: ";", 
         skipEmptyLines: true,
         dynamicTyping: false,
-        worker: true, // <--- ESTO ACELERA EL PROCESO EN SEGUNDO PLANO
         chunk: function(results) {
             results.data.forEach(row => {
                 const tdaName = getColValue(row, ['Name', 'name', 'Tienda', 'tienda', 'Nombre']);
