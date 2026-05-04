@@ -69,12 +69,13 @@ function cargarDatosPorMes(nombreArchivo) {
         tienda: new Set(), division: new Set(), categoria: new Set(), grupo: new Set() 
     };
 
-    Papa.parse(nombreArchivo, {
+   Papa.parse(nombreArchivo, {
         download: true,
         header: true,
         delimiter: ";", 
         skipEmptyLines: true,
         dynamicTyping: false,
+        worker: true, // <--- ESTO ACELERA EL PROCESO EN SEGUNDO PLANO
         chunk: function(results) {
             results.data.forEach(row => {
                 const tdaName = getColValue(row, ['Name', 'name', 'Tienda', 'tienda', 'Nombre']);
