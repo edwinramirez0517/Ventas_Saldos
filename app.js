@@ -53,29 +53,23 @@ function getColValue(row, possibleNames) {
     return 0; 
 }
 
-$(document).ready(function () {
-    Chart.register(ChartDataLabels);
-    $('.form-select').select2({ theme: 'bootstrap-5', placeholder: 'Todas...', allowClear: true, closeOnSelect: false, templateResult: formatState });
+// ==========================================
+// MOTOR DE LECTURA POR MES
+// ==========================================
+function cargarDatosPorMes(nombreArchivo) {
+    $('#loader-overlay').css('display', 'flex');
+    $('#loader-text').text("Cargando datos de " + nombreArchivo + "...");
+    $('#loader-text').css("color", "#6c757d");
+    $('#main-content').hide();
 
-    const conf = { 
-        dom: 'lrtip',
-        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json' }, 
-        pageLength: 20, 
-        deferRender: true,
-        columnDefs: [
-            { targets: [3, 4, 6, 7, 8, 9, 10, 11], render: function (data, type) { if (type === 'display') return formatNum(data); return data; } },
-            { targets: [5], render: function (data, type) { if (type === 'display') return formatBadge(data); return data; } },
-            { targets: [6, 7], className: 'col-tienda text-center align-middle' },
-            { targets: [8, 9], className: 'col-cedis text-center align-middle' },
-            { targets: [10, 11], className: 'col-total text-center align-middle' },
-            { targets: '_all', className: 'text-center align-middle' } 
-        ]
+    // Limpiar variables al cambiar de mes
+    globalData = [];
+    lookups = { 
+        empresa: new Set(), cat_tienda: new Set(), tipo_tienda: new Set(), 
+        tienda: new Set(), division: new Set(), categoria: new Set(), grupo: new Set() 
     };
-    
-    tablaG = $('#tablaGrupo').DataTable(conf);
-    tablaT = $('#tablaTienda').DataTable(conf);
 
-    Papa.parse("reporte_ventas_unidades_2025_2026.csv", {
+    Papa.parse(nombreArchivo, {
         download: true,
         header: true,
         delimiter: ";", 
@@ -87,6 +81,7 @@ $(document).ready(function () {
                 const grpName = getColValue(row, ['Grupo', 'grupo', 'GRUPO']);
                 
                 if (!tdaName || !grpName) return; 
+                
                 const upperName = String(tdaName).toUpperCase();
                 
                 if (upperName.includes('MEGATIENDA#2-AEC-DS')) return; 
@@ -123,19 +118,71 @@ $(document).ready(function () {
             });
         },
         complete: function() {
+            // Protección contra 404 en GitHub Pages (Si no encuentra el archivo CSV, carga vacío)
+            if (globalData.length === 0) {
+                $('#loader-text').html(`<b>¡Archivo no encontrado!</b><br>El mes <b>${nombreArchivo}</b> aún no ha sido subido al repositorio.`);
+                $('#loader-text').css("color", "var(--brand-red)");
+                setTimeout(() => {
+                    $('#loader-overlay').hide();
+                    $('#main-content').show();
+                    populateSelects();
+                    filtrarYActualizar();
+                    alert(`El archivo ${nombreArchivo} no tiene datos o aún no lo has subido a GitHub.`);
+                }, 2000);
+                return;
+            }
+
             populateSelects();
             $('#main-content').show();
+            // Limpiamos los filtros de usuario (excepto el de mes)
+            $('.form-select').not('#selector_mes').val(null).trigger('change.select2');
             filtrarYActualizar();
             $('#loader-overlay').hide(); 
         },
         error: function(err) {
-            $('#loader-text').text("Error leyendo el CSV.");
-            $('#loader-text').css("color", "red");
+            alert("Ocurrió un error leyendo el CSV.");
+            $('#loader-overlay').hide();
         }
     });
+}
 
-    $('#btnLimpiar').click(() => { $('.form-select').val(null).trigger('change'); filtrarYActualizar(); });
-    $('.form-select').on('change', function () { if (!actualizando) filtrarYActualizar(); });
+$(document).ready(function () {
+    Chart.register(ChartDataLabels);
+    // Inicializar Select2 omitiendo el selector de meses
+    $('.form-select').not('#selector_mes').select2({ theme: 'bootstrap-5', placeholder: 'Todas...', allowClear: true, closeOnSelect: false, templateResult: formatState });
+
+    const conf = { 
+        dom: 'lrtip',
+        language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json' }, 
+        pageLength: 20, 
+        deferRender: true,
+        columnDefs: [
+            { targets: [3, 4, 6, 7, 8, 9, 10, 11], render: function (data, type) { if (type === 'display') return formatNum(data); return data; } },
+            { targets: [5], render: function (data, type) { if (type === 'display') return formatBadge(data); return data; } },
+            { targets: [6, 7], className: 'col-tienda text-center align-middle' },
+            { targets: [8, 9], className: 'col-cedis text-center align-middle' },
+            { targets: [10, 11], className: 'col-total text-center align-middle' },
+            { targets: '_all', className: 'text-center align-middle' } 
+        ]
+    };
+    
+    tablaG = $('#tablaGrupo').DataTable(conf);
+    tablaT = $('#tablaTienda').DataTable(conf);
+
+    // ==========================================
+    // DISPARADORES DE EVENTOS
+    // ==========================================
+    
+    // Cargar el mes inicial por defecto
+    cargarDatosPorMes($('#selector_mes').val());
+
+    // Cargar datos nuevos cuando se cambia el mes
+    $('#selector_mes').on('change', function() {
+        cargarDatosPorMes($(this).val());
+    });
+
+    $('#btnLimpiar').click(() => { $('.form-select').not('#selector_mes').val(null).trigger('change'); filtrarYActualizar(); });
+    $('.form-select').not('#selector_mes').on('change', function () { if (!actualizando) filtrarYActualizar(); });
 
     $('#buscadorGlobal').on('keyup', function () {
         const val = $(this).val();
@@ -287,36 +334,15 @@ function actualizarGraficos(ventasData) {
     const topCat = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
     const topDiv = Object.entries(divMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
 
-    // CONFIGURACIÓN VISUAL LIMPIA (Sin cuadrícula, sin números en Eje Y)
     const cleanOptions = {
         maintainAspectRatio: false,
-        scales: {
-            x: { grid: { display: false }, border: { display: false } },
-            y: { display: false } // Oculta el eje Y por completo
-        },
-        plugins: {
-            datalabels: { color: '#000', anchor: 'end', align: 'top', font: {weight: 'bold'}, formatter: v=>formatNum(v) },
-            legend: { display: false }
-        }
+        scales: { x: { grid: { display: false }, border: { display: false } }, y: { display: false } },
+        plugins: { datalabels: { color: '#000', anchor: 'end', align: 'top', font: {weight: 'bold'}, formatter: v=>formatNum(v) }, legend: { display: false } }
     };
 
     if(chart1) chart1.destroy();
-    chart1 = new Chart($('#chartCategorias'), { 
-        type: 'bar', 
-        data: { 
-            labels: topCat.map(x=>x[0].substring(0,15)), 
-            datasets: [{ label: 'Venta Actual', data: topCat.map(x=>x[1]), backgroundColor: '#012094', borderRadius: 4 }] 
-        }, 
-        options: { ...cleanOptions, plugins: { ...cleanOptions.plugins, title: {display:true, text:'Top 10 Categorías', font: {size: 14}} } } 
-    });
+    chart1 = new Chart($('#chartCategorias'), { type: 'bar', data: { labels: topCat.map(x=>x[0].substring(0,15)), datasets: [{ label: 'Venta Actual', data: topCat.map(x=>x[1]), backgroundColor: '#012094', borderRadius: 4 }] }, options: { ...cleanOptions, plugins: { ...cleanOptions.plugins, title: {display:true, text:'Top 10 Categorías', font: {size: 14}} } } });
 
     if(chart2) chart2.destroy();
-    chart2 = new Chart($('#chartDivisiones'), { 
-        type: 'bar', 
-        data: { 
-            labels: topDiv.map(x=>x[0].substring(0,15)), 
-            datasets: [{ label: 'Venta Actual', data: topDiv.map(x=>x[1]), backgroundColor: '#E1251B', borderRadius: 4 }] 
-        }, 
-        options: { ...cleanOptions, plugins: { ...cleanOptions.plugins, title: {display:true, text:'Top 10 Divisiones', font: {size: 14}} } } 
-    });
+    chart2 = new Chart($('#chartDivisiones'), { type: 'bar', data: { labels: topDiv.map(x=>x[0].substring(0,15)), datasets: [{ label: 'Venta Actual', data: topDiv.map(x=>x[1]), backgroundColor: '#E1251B', borderRadius: 4 }] }, options: { ...cleanOptions, plugins: { ...cleanOptions.plugins, title: {display:true, text:'Top 10 Divisiones', font: {size: 14}} } } });
 }
