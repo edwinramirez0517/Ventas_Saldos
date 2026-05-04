@@ -32,7 +32,6 @@
         .kpi-card { border-radius: 10px; padding: 15px 12px; height: 100%; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.08); transition: transform 0.2s ease, box-shadow 0.2s ease; border: none; }
         .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 8px 12px rgba(0,0,0,0.15); }
         
-        /* Colores Específicos por Tarjeta */
         .bg-vta-pas { background: linear-gradient(135deg, #f8f9fa, #e9ecef); border-left: 5px solid #6c757d; }
         .bg-vta-act { background: linear-gradient(135deg, #d1e7dd, #badce3); border-left: 5px solid #198754; }
         .bg-dif { background: linear-gradient(135deg, #cfe2ff, #b6d4fe); border-left: 5px solid var(--brand-blue); }
@@ -49,10 +48,8 @@
         table.dataTable thead th { position: sticky !important; top: 0 !important; z-index: 1000 !important; background-color: var(--brand-blue) !important; color: white !important; text-align: center !important; border-bottom: 3px solid var(--brand-red) !important; border-right: 1px solid rgba(255, 255, 255, 0.2) !important; border-top: none !important; border-left: none !important; }
         table.dataTable tbody td { text-align: center !important; vertical-align: middle !important; transition: background-color 0.2s ease; border-bottom: 1px solid rgba(1, 32, 148, 0.2) !important; border-right: 1px solid rgba(1, 32, 148, 0.1) !important; border-top: none !important; border-left: none !important; }
         
-        /* Iluminar toda la fila al pasar el mouse */
         table.dataTable tbody tr:hover td { background-color: rgba(1, 32, 148, 0.12) !important; color: var(--brand-blue); font-weight: bold; cursor: pointer; }
 
-        /* Resaltes de columnas */
         .col-tienda { background-color: rgba(255, 193, 7, 0.08) !important; }
         .col-cedis { background-color: rgba(23, 162, 184, 0.08) !important; }
         .col-total { background-color: rgba(225, 37, 27, 0.15) !important; font-weight: 900 !important; color: var(--brand-red); font-size: 0.85rem;}
@@ -65,7 +62,7 @@
     <div id="loader-overlay">
         <div class="spinner"></div>
         <h3 style="margin-top: 20px; color: var(--brand-blue); font-weight: bold;">Procesando...</h3>
-        <p id="loader-text" style="color: #6c757d;">Construyendo base de datos</p>
+        <p id="loader-text" style="color: #6c757d;">Cargando base de datos</p>
     </div>
 
     <div class="brand-header">
@@ -74,8 +71,31 @@
     </div>
 
     <div class="container-fluid px-md-4" id="main-content" style="display: none;">
+        
         <div class="content-container border-top border-danger border-3">
-            <h6 class="fw-bold mb-3" style="color: var(--brand-blue);">Filtros de Análisis</h6>
+            <!-- SELECTOR DE MES AUTOMÁTICO -->
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
+                <h6 class="fw-bold mb-0" style="color: var(--brand-blue);">Filtros de Análisis</h6>
+                <div class="d-flex align-items-center">
+                    <label class="fw-bold me-2 mb-0" style="color: var(--brand-red);">📅 Mes a Consultar:</label>
+                    <!-- Nota: El value="" debe ser el nombre exacto de tus archivos CSV en GitHub -->
+                    <select id="selector_mes" class="form-select form-select-sm border-danger" style="width: 220px; font-weight: bold; cursor: pointer;">
+                        <option value="enero.csv">Enero</option>
+                        <option value="febrero.csv">Febrero</option>
+                        <option value="marzo.csv">Marzo</option>
+                        <option value="abril.csv">Abril</option>
+                        <option value="mayo.csv" selected>Mayo</option>
+                        <option value="junio.csv">Junio</option>
+                        <option value="julio.csv">Julio</option>
+                        <option value="agosto.csv">Agosto</option>
+                        <option value="septiembre.csv">Septiembre</option>
+                        <option value="octubre.csv">Octubre</option>
+                        <option value="noviembre.csv">Noviembre</option>
+                        <option value="diciembre.csv">Diciembre</option>
+                    </select>
+                </div>
+            </div>
+
             <div class="row g-2">
                 <div class="col-6 col-md-2"><label class="form-label fw-bold mb-0">🏢 Empresa:</label><select id="f_empresa" class="form-select" multiple></select></div>
                 <div class="col-6 col-md-2"><label class="form-label fw-bold mb-0">🏷️ Categ. Tienda:</label><select id="f_cat_tienda" class="form-select" multiple></select></div>
@@ -107,6 +127,7 @@
 
         <div class="row mb-3">
             <div class="col-12">
+                <!-- Buscador global que habías agregado -->
                 <input type="text" id="buscadorGlobal" class="form-control" placeholder="🔍 Buscar en todas las tablas..." style="border: 2px solid var(--brand-blue); border-radius: 8px; padding: 10px 15px; font-size: 1.1rem; font-weight: bold; color: var(--brand-blue); box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: border-color 0.2s;">
             </div>
         </div>
